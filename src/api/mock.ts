@@ -10,10 +10,10 @@ import {
   type Activity, type CodeFile, type Finding, type IsatvonField, type Persist, type SkillRow,
   type IngestionRun, type ScanEvent, type Snapshot, type Sow, type Stage, type StepId, type StepInfo, type Tests, type UploadRecord, type VersionEntry, type Workflow,
 } from './types.ts'
-import { RFQ_REQUIREMENTS, clusterRequirement, parseRequirements, renderSowHtml, reqPassage } from './sowFormat.ts'
+import { RFQ_REQUIREMENTS, clusterRequirement, parseRequirements, renderSowHtml, reqPassage, produceDynamicSowHtml } from './sowFormat.ts'
 
 const REGISTRY = ['fastmcp', 'dbhub', 'apache superset', 'openpyxl', 'duckdb', 'postgresql', 'pydantic',
-  'jinja2', 'cognee', 'bifrost', 'temporal', 'promptfoo', 'pandas']
+  'jinja2', 'cognee', 'context engine', 'bifrost', 'temporal', 'promptfoo', 'pandas', 'cadquery', 'opencascade', 'bullm dmr', 'repel', 'clamav']
 
 const now = () => new Date().toISOString()
 const rid = (p: string) => `${p}-${crypto.randomUUID().slice(0, 8)}`
@@ -94,7 +94,7 @@ async function sha256(text: string) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-const TITLES = ['SOW generation and approval', 'SOW to ISATVON skills', 'Temporal validation', 'Test, persist, deploy']
+const TITLES = ['SOW generation and approval', 'SOW to ISATVON skills', 'Contract and checks', 'Test, persist, deploy']
 
 const fileName = (s: SkillRow) => `skills/${s.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}.py`
 
@@ -197,8 +197,8 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
   function steps(): StepInfo[] {
     const active = activeStep()
     const titles = TITLES
-    const lockReasons = ['', 'Approve the SOW in 3.1 to unlock the skills grid', 'Generate the ISATVON Contract in 3.2 to unlock validation',
-      'Approve the manifest and code in 4.1 to unlock testing']
+    const lockReasons = ['', 'Approve the SOW to unlock the Skills grid', 'Generate the ISATVON Contract in the Skills grid to unlock validation',
+      'Approve the manifest and code in Validation to unlock testing']
     const wf = s.workflow
     const tests = currentTests()
     const info = (n: StepId): Omit<StepInfo, 'id' | 'title' | 'stale' | 'editable' | 'background'> => {
@@ -218,14 +218,14 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
           if (s.sow?.status === 'regenerating') return { state: 'active', reason: 'Regenerating SOW after change request' }
           if (s.sow && s.sow.status !== 'approved') return { state: 'needs_review', reason: `SOW v${s.sow.version} awaiting review` }
           if (s.sow) return { state: 'active', reason: `Reopened; approval of v${s.sow.approval!.version} still valid until edited` }
-          return { state: 'active', reason: s.ingestion ? 'Waiting for the RAG context (stage 2) to generate the SOW'
-            : s.uploads.length ? 'Start the ingestion run in 1.1 once every virus scan passes' : 'Upload documents in 1.1 Intake console' }
+          return { state: 'active', reason: s.ingestion ? 'Waiting for the RAG context to generate the SOW'
+            : s.uploads.length ? 'Start the ingestion run in Scan once every virus scan passes' : 'Upload documents in Upload' }
         case 2:
           if (running(s.extraction)) return { state: 'active', reason: 'Extracting skills from the approved SOW' }
           if (!s.gridReviewedAt) return { state: 'needs_review', reason: `Review ${s.skills.length} skills, then mark the grid reviewed` }
           return { state: 'active', reason: 'Grid reviewed: generate the ISATVON Contract' }
         case 3:
-          if (wf?.status === 'running') return { state: 'active', reason: 'Temporal workflow running' }
+          if (wf?.status === 'running') return { state: 'active', reason: 'Check activities running' }
           return { state: 'needs_review', reason: 'Review and edit the generated code and manifest, then approve them' }
         case 4:
           if (!tests) return { state: 'active', reason: s.tests ? 'Results are for an earlier manifest: re-run the sandbox and assertions' : 'Run the sandbox and assertion suite' }
@@ -252,11 +252,35 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
   function produceSow(reason: string, contextRunId?: string) {
     const prev = s.sow
     const version = (prev?.version ?? 0) + 1
-    const html = renderSowHtml(RFQ_REQUIREMENTS, s.sowNotes)
+
+    let fdeGoals = ''
+    try {
+      fdeGoals = localStorage.getItem('bam-fde-goals') || ''
+    } catch {}
+
+    const releasedFiles = s.uploads.filter(isReleased).map(f => f.name)
+    let verifiedChecks: Array<{ id: string; category: string; question: string; answer: string; citations?: Array<{ label: string; s3: string }> }> = []
+    try {
+      const raw = localStorage.getItem('bam-preflight-checks')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          verifiedChecks = parsed.filter((c: any) => c.status === 'passed')
+        }
+      }
+    } catch {}
+
+    const html = produceDynamicSowHtml({
+      fdeGoals,
+      releasedFiles,
+      verifiedChecks,
+      notes: s.sowNotes,
+    })
+
     s.sow = {
       version, generatedVersion: version, updatedAt: now(), status: 'draft', html, generatedHtml: html,
       previous: prev && { version: prev.version, html: prev.html, at: prev.updatedAt },
-      meta: { sowId: 'SOW-2026-0147', client: 'Meridian (sample/placeholder client)', lengthMode: 'Custom (short form)', sources: s.uploads.filter(isReleased).length },
+      meta: { sowId: 'SOW-2026-0147', client: 'Meridian Aerospace & Defense', lengthMode: 'Custom (short form)', sources: s.uploads.filter(isReleased).length },
       invalidated: prev?.approval ? { version: prev.approval.version, at: now(), reason } : prev?.invalidated,
       changeRequest: prev?.changeRequest,
       contextRunId: contextRunId ?? prev?.contextRunId,
@@ -305,7 +329,7 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
     await runPipeline(list, () => s.sowGeneration, [
       { ms: 1400, work: () => {
         const bad = files.find(f => /corrupt/i.test(f.name))
-        if (bad) throw new Error(`${bad.name} could not be read into the context. Remove or replace it in 1.1, then retry.`)
+        if (bad) throw new Error(`${bad.name} could not be read into the context. Remove or replace it in Upload, then retry.`)
         return `Context from ${files.length} source object(s)`
       } },
       { ms: 1200, work: () => 'Relevant graph context retrieved for the SOW template' },
@@ -344,7 +368,7 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
       { ms: 1600, work: () => {
         // Parse the ISATVON blocks of the APPROVED SOW (human edits included), then cluster into agents/skills.
         const reqs = parseRequirements(sow.html)
-        if (!reqs.length) throw new Error('No "Requirement N" ISATVON blocks found in the approved SOW. Reopen 3.1 to fix the document.')
+        if (!reqs.length) throw new Error('No "Requirement N" ISATVON blocks found in the approved SOW. Reopen the SOW to fix the document.')
         rows = reqs.map(({ n, passageId, fields }) => ({
           id: `SK-${String(n).padStart(3, '0')}`, ...clusterRequirement(n, fields), passageId, passageExcerpt: fields.instructions,
           fields: { ...fields }, original: { ...fields }, errors: validateRow(fields), status: 'PARSED' as const,
@@ -419,7 +443,7 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
       for (const r of s.skills)
         for (const dep of r.fields.techStack.split(',').map(t => t.trim()).filter(Boolean))
           if (!REGISTRY.includes(dep.toLowerCase()))
-            a.findings.push({ id: rid('f'), severity: 'error', skillId: r.id, message: `${r.name}: "${dep}" is not in the system registry. Reopen 3.2 to change the tech stack.` })
+            a.findings.push({ id: rid('f'), severity: 'error', skillId: r.id, message: `${r.name}: "${dep}" is not in the system registry. Reopen the Skills grid to change the tech stack.` })
       a.detail = `${new Set(s.skills.flatMap(r => r.fields.techStack.split(',').map(t => t.trim().toLowerCase()))).size} dependencies checked against the registry`
     })
     return (async () => {
@@ -456,14 +480,14 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
     const runId = rid('test')
     archiveTests()
     const tests: Tests = { runId, manifestVersion: wf.manifest!.version, manifestHash: wf.manifest!.hash, sowVersion: wf.manifest!.sowVersion, startedAt: now(), assertions: [],
-      sandbox: { key: 'sandbox', label: 'CubeSandbox MicroVM run', status: 'queued', runId },
-      promptfoo: { key: 'promptfoo', label: 'Promptfoo assertion suite', status: 'queued', runId } }
+      sandbox: { key: 'sandbox', label: 'Isolated sandbox run', status: 'queued', runId },
+      promptfoo: { key: 'promptfoo', label: 'Assertion suite', status: 'queued', runId } }
     s.tests = tests
     s.stale.delete(4)
     s.persist.artifacts = []; s.persist.deploy = undefined
     const list = [tests.sandbox, tests.promptfoo]
     await runPipeline(list, () => s.tests === tests ? list : [], [
-      { ms: 1200, work: () => `${s.code.length} FastMCP tools executed in an isolated MicroVM` },
+      { ms: 1200, work: () => `${s.code.length} tools executed in an isolated sandbox` },
       { ms: 1600, work: () => {
         for (const r of s.skills) {
           const todo = r.fields.instructions.match(/\b(TODO|TBD)\b/i)?.[0]
@@ -476,12 +500,12 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
           add('Output conforms to Outcome schema', 'pass', vars, r.fields.outcome, `{"status": "ok", "payload": {"variables": ${vars}}} · validated against Outcome`)
           add('Instructions fully specified', todo ? 'fail' : 'pass', r.fields.instructions, 'No TODO/TBD placeholders in I (Instructions)',
             todo ? `Found "${todo}" in the instructions` : 'No placeholders found', todo ? 'Instructions contain an unresolved TODO/TBD placeholder' : undefined)
-          add('No unhandled exception in sandbox', 'pass', `run(${fixture})`, 'Exit code 0, no exception raised', 'Exit code 0 · 0 exceptions · CubeSandbox MicroVM')
+          add('No unhandled exception in sandbox', 'pass', `run(${fixture})`, 'Exit code 0, no exception raised', 'Exit code 0 · 0 exceptions · isolated sandbox')
           r.status = todo ? 'TEST_FAILED' : 'TEST_PASSED'
         }
         s.skillsRevision++
         const failedCount = tests.assertions.filter(x => x.status === 'fail').length
-        if (failedCount) throw new Error(`${failedCount} of ${tests.assertions.length} assertions failed. Reopen 3.2 to fix the skill, then re-run 4.1 and 4.4.`)
+        if (failedCount) throw new Error(`${failedCount} of ${tests.assertions.length} assertions failed. Reopen the Skills grid to fix the skill, then re-run Validation and Test results.`)
         return `${tests.assertions.length} of ${tests.assertions.length} assertions passed`
       } },
     ])
@@ -524,8 +548,29 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
     u.scanEndedAt = now()
     // Fail closed: an outage or unreadable verdict is an error, never clean and never a threat.
     if (o === 'error') { u.scanError = 'Scan service did not return a verdict (simulated outage).'; logScan(u, 'error'); return }
-    if (o === 'threat') { u.scan = 'blocked'; u.threat = 'Malware signature match (simulated)'; logScan(u, 'threat'); return }
-    u.scan = 'verified'; u.released = true; u.objectKey = u.objectKey.replace('s3://bam-quarantine/', 's3://bam-intake/')
+    if (o === 'threat') {
+      u.scan = 'blocked'
+      u.clamavVerdict = 'threat'
+      u.repelVerdict = 'threat'
+      u.threat = 'ClamAV malware signature & Repel adversarial payload detected (simulated)'
+      u.repelDetails = {
+        adversarialEvasionScore: 92.4,
+        promptInjectionRisk: 'high',
+        heuristicFlags: ['EVASION_POLYGLOT_PAYLOAD', 'ADVERSARIAL_PROMPT_OVERRIDE'],
+      }
+      logScan(u, 'threat')
+      return
+    }
+    u.scan = 'verified'
+    u.released = true
+    u.clamavVerdict = 'clean'
+    u.repelVerdict = 'clean'
+    u.repelDetails = {
+      adversarialEvasionScore: 0.8,
+      promptInjectionRisk: 'none',
+      heuristicFlags: [],
+    }
+    u.objectKey = u.objectKey.replace('s3://bam-quarantine/', 's3://bam-intake/')
     logScan(u, 'clean')
   }
 
@@ -534,19 +579,21 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
     async getSkills() { await latency(); return structuredClone(s.skills) },
     async getCode() { await latency(); return structuredClone(s.code) },
 
-    async uploadFile(file, onProgress) {
+    async uploadFile(file: { name: string; size: number; batchId?: string }, onProgress) {
       assertActive(1)
       if (!acceptedType(file.name)) throw new Error(`File type ${file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '(none)'} is not accepted. Use ${ACCEPTED_TYPES.join(', ')}.`)
       if (file.size > MAX_UPLOAD_BYTES) throw new Error(`File exceeds the ${MAX_UPLOAD_BYTES / 1048576} MB limit`)
-      // Server-side batch limits: the UI checks a whole selection first, this is the boundary.
-      if (s.uploads.length >= MAX_BATCH_FILES) throw new Error(`The batch is full (${MAX_BATCH_FILES} files)`)
-      if (s.uploads.reduce((n, u) => n + u.size, 0) + file.size > MAX_BATCH_BYTES) throw new Error(`The batch would exceed ${MAX_BATCH_BYTES / 1048576} MB`)
+      // Server-side batch limits: checked per batch wave (up to 9 waves allowed).
+      const currentBatchId = file.batchId ?? s.batchId
+      const batchUploads = s.uploads.filter(u => u.batchId === currentBatchId)
+      if (batchUploads.length >= MAX_BATCH_FILES) throw new Error(`The batch is full (${MAX_BATCH_FILES} files)`)
+      if (batchUploads.reduce((n, u) => n + u.size, 0) + file.size > MAX_BATCH_BYTES) throw new Error(`The batch would exceed ${MAX_BATCH_BYTES / 1048576} MB`)
       // Multipart: one request per 10 MB part (a single request for small files).
       const parts = chunkCount(file.size)
       for (let i = 1; i <= parts; i++) { await sleep(parts === 1 ? 600 : 260); onProgress(Math.min(file.size, Math.round(file.size * i / parts)), file.size) }
       const id = rid('obj')
       // Staged in private quarantine; only a clean verdict moves it to the clean RAG input prefix.
-      const rec: UploadRecord = { id, batchId: s.batchId, name: file.name, size: file.size, status: 'stored', uploadedAt: now(),
+      const rec: UploadRecord = { id, batchId: currentBatchId, name: file.name, size: file.size, status: 'stored', uploadedAt: now(),
         objectKey: `s3://bam-quarantine/${id}/${file.name}`, parts, scan: 'scanning', released: false }
       s.uploads.push(rec)
       outcomes.set(id, scanOutcome)
@@ -578,12 +625,16 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
       if (!u || !isReleased(u)) throw new Error('Only released, verified files can be opened')
       return { url: `mock://bam-intake/${id}?preview`, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() }
     },
-    async startIngestionRun() {
+    async startIngestionRun(fileIds?: string[]) {
       assertActive(1)
       // Atomic re-check of the whole batch (no await before the write); a repeated start for the same files is rejected.
       const block = ingestionBlock(s.uploads, { ingestion: s.ingestion })
-      if (block) throw new Error(block)
-      s.ingestion = { runId: rid('ingest'), at: now(), fileIds: s.uploads.filter(isReleased).map(u => u.id) }
+      if (block && !(fileIds && block === 'These verified files are already ingested')) throw new Error(block)
+      const clean = s.uploads.filter(isReleased).map(u => u.id)
+      const ids = fileIds ? clean.filter(id => fileIds.includes(id)) : clean
+      if (!ids.length) throw new Error('No ready files to ingest')
+      if (s.ingestion && ids.length === s.ingestion.fileIds.length && ids.every(id => s.ingestion!.fileIds.includes(id))) throw new Error('These verified files are already ingested')
+      s.ingestion = { runId: rid('ingest'), at: now(), fileIds: ids }
       await latency()
       return structuredClone(s.ingestion)
     },
@@ -600,14 +651,40 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
           s.uploads.push(u)
           s.scanEvents.push({ id: rid('ev'), fileId: id, name: f.name, kind: 'staged', at })
           if (f.scan === 'scanning') { outcomes.set(id, 'clean'); void scan(id); continue }
-          Object.assign(u, f.scan === 'verified' ? { scan: 'verified', released: true } : { scan: 'blocked', threat: 'Malware signature match (fixture)' }, { scanEndedAt: at })
+          Object.assign(
+            u,
+            f.scan === 'verified'
+              ? {
+                  scan: 'verified',
+                  released: true,
+                  clamavVerdict: 'clean',
+                  repelVerdict: 'clean',
+                  repelDetails: {
+                    adversarialEvasionScore: 1.1,
+                    promptInjectionRisk: 'none',
+                    heuristicFlags: [],
+                  },
+                }
+              : {
+                  scan: 'blocked',
+                  clamavVerdict: 'clean',
+                  repelVerdict: 'threat',
+                  threat: 'Repel evasion shield: adversarial macro & prompt injection attempt detected',
+                  repelDetails: {
+                    adversarialEvasionScore: 94.6,
+                    promptInjectionRisk: 'high',
+                    heuristicFlags: ['EVASION_POLYGLOT_PAYLOAD', 'ADVERSARIAL_PROMPT_OVERRIDE'],
+                  },
+                },
+            { scanEndedAt: at }
+          )
           s.scanEvents.push({ id: rid('ev'), fileId: id, name: f.name, kind: f.scan === 'verified' ? 'clean' : 'threat', at })
         }
       },
     },
     async startSowGeneration(contextRunId) {
       assertActive(1)
-      if (!s.ingestion || !s.uploads.some(isReleased)) throw new Error('Start the ingestion run in 1.1 once virus scans pass')
+      if (!s.ingestion || !s.uploads.some(isReleased)) throw new Error('Start the ingestion run in Scan once virus scans pass')
       await latency()
       void startSowGeneration(contextRunId)
     },
@@ -694,7 +771,7 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
       const wf: Workflow = {
         workflowId: `isatvon-validation-${s.sow!.approval!.version}-${s.runCount}`, runId: crypto.randomUUID(), status: 'running', startedAt: now(),
         activities: [activity('A', 'ISATVON contract validation'), activity('B', 'Dependency and runtime check'),
-          activity('C', 'AST code generation'), activity('D', 'Retry and fallback', 'Standby: runs only if C fails')],
+          activity('C', 'Translation check'), activity('D', 'Retry and fallback', 'Standby: runs only if C fails')],
       }
       s.workflow = wf
       void runWorkflow(wf, 'A')
@@ -780,11 +857,11 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
       assertActive(4)
       const tests = currentTests()
       if (!tests || tests.promptfoo.status !== 'succeeded') throw new Error('All assertions must pass for this manifest before committing')
-      if (!tests.reviewedAt) throw new Error('Review the Promptfoo results before committing')
+      if (!tests.reviewedAt) throw new Error('Review the assertion results before committing')
       await latency()
       const draft = s.persist.draft!
       // ponytail: Xyflow DAG topology is out of scope for the first release; add a third artifact here when it returns.
-      const list = stages(rid('tx'), [['contract', 'JSON contract → isatvon_contracts (JSONB)'], ['ast', 'AST Python code → skill_code (JSONB)']])
+      const list = stages(rid('tx'), [['contract', 'JSON contract → isatvon_contracts (JSONB)'], ['ast', 'Translated Python code → skill_code (JSONB)']])
       s.persist.artifacts = list
       void runPipeline(list, () => s.persist.artifacts, list.map(a => ({ ms: 700, work: () => `Row written for manifest ${draft.version}` })))
         .then(ok => { if (ok) { s.persist.committed = { ...draft, at: now(), runId: list[0].runId }; record('frozen', 'Committed to BAM_db (immutable rows)', { runId: list[0].runId }) } })

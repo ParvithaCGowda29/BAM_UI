@@ -32,7 +32,7 @@ export function SkillReview({ snap }: { snap: Snapshot }) {
   return (
     <main className="panes">
       <Pane id="left-title" kicker="Context and navigation" title="Skills">
-        {isLoading && !rows ? <Skeleton rows={6} /> : !rows?.length ? <Empty title="No skills yet">Skills are extracted in 3.2 after the SOW is approved in 3.1.</Empty> : agents.map(a => (
+        {isLoading && !rows ? <Skeleton rows={6} /> : !rows?.length ? <Empty title="No skills yet">Skills are extracted in the Skills grid after the SOW is approved.</Empty> : agents.map(a => (
           <Section key={a} title={a}>
             <ul className="nav-list">{rows.filter(r => r.agent === a).map(r => (
               <li key={r.id}><button className="nav-item" aria-current={skill?.id === r.id || undefined} onClick={() => setUi({ reviewSkill: r.id })}>
@@ -40,10 +40,10 @@ export function SkillReview({ snap }: { snap: Snapshot }) {
               </button></li>))}</ul>
           </Section>))}
       </Pane>
-      <Pane id="center-title" kicker="3.3 · Skills/code review (read-only)" title={skill ? `${skill.agent} › ${skill.name}` : 'Skills/code review'} className="center"
+      <Pane id="center-title" kicker="Skill review (read-only)" title={skill ? `${skill.agent} › ${skill.name}` : 'Skill review'} className="center"
         actions={skill && <StatusPill status={skill.status === 'TEST_FAILED' ? 'fail' : skill.status === 'PARSED' ? 'queued' : 'pass'} text={skill.status} />}>
-        {!skill ? <Empty icon="file" title="Nothing to review yet">Approve the SOW in 3.1 to extract skills, then generate the contract in 3.2 to produce code.</Empty> : <>
-          <Banner tone="info" icon="eye">Review context, read-only. Change fields in <button className="link" onClick={() => goScreen('3.2')}>3.2 ISATVON skills grid</button> and code in <button className="link" onClick={() => file ? openCode(file.path) : goScreen('4.3')}>4.3 Generated code</button>.</Banner>
+        {!skill ? <Empty icon="file" title="Nothing to review yet">Approve the SOW to extract skills, then generate the contract in the Skills grid to produce code.</Empty> : <>
+          <Banner tone="info" icon="eye">Review context, read-only. Change fields in <button className="link" onClick={() => goScreen('3.2')}>Skills grid</button> and code in <button className="link" onClick={() => file ? openCode(file.path) : goScreen('4.3')}>Generated code</button>.</Banner>
           <Section title="ISATVON contract" aside={<span className="mono xs muted">{skill.id} · SOW {skill.passageId}</span>}>
             <table className="table contract">
               <tbody>{ISATVON.map(c => {
@@ -59,18 +59,18 @@ export function SkillReview({ snap }: { snap: Snapshot }) {
             </table>
           </Section>
           <Section title="Generated code" aside={file && <Copy value={file.path} label="file path" />}>
-            {!file ? <p className="muted sm">No code yet: 4.1 activity C renders it after the ISATVON Contract is generated in 3.2.</p> : <>
+            {!file ? <p className="muted sm">No code yet: Validation activity C renders it after the ISATVON Contract is generated in the Skills grid.</p> : <>
               {draft[file.path] !== undefined && draft[file.path] !== file.content && <Banner tone="warn" icon="edit">This file has unsaved edits in 4.3. They are not shown here until saved.</Banner>}
               <p className="muted xs">{file.edited ? 'Edited by a reviewer; compared with the generated version' : 'Unedited generated code'} <span className="diff-legend"><ins className="d-added">Added</ins><del className="d-removed">Removed</del></span></p>
               <div className="monaco-box short">
                 <ReviewEditor path={`review/${file.path}`} language="python" original={file.generated} value={file.content} editable={false}
-                  lockedReason="Read-only review. Edit this file in 4.3 Generated code." showChanges onChange={() => {}} onSave={() => {}} />
+                  lockedReason="Read-only review. Edit this file in Generated code." showChanges onChange={() => {}} onSave={() => {}} />
               </div>
-              <button className="link sm" onClick={() => openCode(file.path)}><Icon name="link" size={12} />Edit in 4.3 Generated code</button>
+              <button className="link sm" onClick={() => openCode(file.path)}><Icon name="link" size={12} />Edit in Generated code</button>
             </>}
           </Section>
           <Section title="Review findings" aside={<span className="muted sm">{findings.filter(f => !f.resolved).length} open</span>}>
-            {findings.length === 0 ? <p className="muted sm">{snap.workflow ? 'No findings for this skill.' : 'Findings come from the 4.1 validation run.'}</p>
+            {findings.length === 0 ? <p className="muted sm">{snap.workflow ? 'No findings for this skill.' : 'Findings come from the validation run.'}</p>
               : <ul className="findings compact">{findings.map(f => <FindingItem key={f.id} f={f} files={files} />)}</ul>}
           </Section>
         </>}
@@ -110,9 +110,9 @@ export function ReleasePrep({ snap }: { snap: Snapshot }) {
             <span>{s.agent} › {s.name}</span></button><Copy value={s.file} display={s.file.replace('skills/', '')} label="file path" /></li>)}</ul>
         </Section>}
       </Pane>
-      <Pane id="center-title" kicker="3.4 · Release prep" title="Manifest and deploy prep" className="center">
+      <Pane id="center-title" kicker="Release prep" title="Manifest and deploy prep" className="center">
         {!m ? <Empty icon="file" title="No manifest yet" action={<button className="btn btn-secondary" onClick={() => goScreen(snap.sow?.approval ? '3.2' : '3.1')}>Open {snap.sow?.approval ? '3.2' : '3.1'}</button>}>
-            The manifest is written by the 4.1 validation run after the ISATVON Contract is generated in 3.2.</Empty> : <>
+            The manifest is written by the validation run after the ISATVON Contract is generated in the Skills grid.</Empty> : <>
           <dl className="kv inline">
             <div><dt>Version</dt><dd className="mono">{m.version}</dd></div>
             <div><dt>Hash</dt><dd><Copy value={m.hash} display={shortHash(m.hash)} label="manifest hash" /></dd></div>
@@ -123,11 +123,11 @@ export function ReleasePrep({ snap }: { snap: Snapshot }) {
           <Section title="Draft vs certified"><ManifestCompare snap={snap} /></Section>
         </>}
         <Section title="Hand-off into the Sandbox">
-          <p className="muted sm">Validation, approval, testing, certification and freezing happen in stage 4. This screen only prepares and links; it cannot bypass any of them.</p>
+          <p className="muted sm">Validation, approval, testing, certification and freezing happen in Sandbox validation. This screen only prepares and links; it cannot bypass any of them.</p>
           <div className="row wrap">
-            <GateButton variant="secondary" icon="link" reason={locked(3)} onClick={() => goScreen('4.1')}>4.1 Activities</GateButton>
-            <GateButton variant="secondary" icon="link" reason={locked(3)} onClick={() => goScreen('4.2')}>4.2 Approve manifest</GateButton>
-            <GateButton icon="bolt" reason={locked(4)} onClick={() => goScreen('4.4')}>4.4 Test and certify</GateButton>
+            <GateButton variant="secondary" icon="link" reason={locked(3)} onClick={() => goScreen('4.2')}>Template</GateButton>
+            <GateButton variant="secondary" icon="link" reason={locked(3)} onClick={() => goScreen('4.2')}>Approve manifest</GateButton>
+            <GateButton icon="bolt" reason={locked(4)} onClick={() => goScreen('4.4')}>Test and certify</GateButton>
           </div>
         </Section>
       </Pane>

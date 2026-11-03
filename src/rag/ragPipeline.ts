@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react'
 import { EDGES, JOBS, NODES, SCHEMAS } from './mockData.ts'
 import { cogneeRunner } from './cognee.ts'
+import { layaJudgeContext, simulatedContextJudge, type ContextJudgeRequest, type ContextJudgeResult } from '../api/sowEval.ts'
 
 export type RagStepKey = 'chunk' | 'extract' | 'graph' | 'schemas'
 export type RagStepStatus = 'queued' | 'running' | 'done' | 'failed'
@@ -28,7 +29,15 @@ export interface RagState {
   graphData?: KnowledgeGraph
   /** Which engine ran the pipeline. */
   engine: 'simulated' | 'cognee'
+  /** Jev System-1 context sufficiency evaluation of the ingested IP data. */
+  contextEvaluation?: import('../api/sowEval.ts').ContextJudgeResult
+  contextEvalStatus?: 'idle' | 'running' | 'done' | 'failed'
+  /** The run whose Context stage the FDE started (Sync's Start) and approved (Verify's Approve). The pipeline builds in
+   *  the background after Parse; the Context steps only count once a person has started / approved them for this run. */
+  contextStartedRun?: string
+  verifiedRun?: string
 }
+
 
 export interface KnowledgeGraph { nodes: { id: string; label: string; type: string }[]; edges: { source: string; target: string; label: string }[] }
 export interface Relation { from: string; fromType: string; label: string; to: string; toType: string }
@@ -69,10 +78,16 @@ export interface RagPipelineService {
   saveSchemaDraft(name: string, code: string): void
   /** Creates a Workbench draft from one schema. Never approves anything. */
   sendToWorkbench(name: string): Handoff
+  /** Evaluates whether all ingested IP documents and discovery facts provide sufficient context. */
+  evaluateContext(customInput?: Partial<ContextJudgeRequest>): Promise<ContextJudgeResult>
+  setContextEvaluation(res: ContextJudgeResult): void
+  /** Sync's Start / Verify's Approve for the current run. */
+  markContextStarted(): void
+  markVerified(): void
 }
 
 const STEP_DEFS: [RagStepKey, string][] = [
-  ['chunk', 'Chunk + embed'], ['extract', 'Entity extraction (Pydantic AI)'], ['graph', 'Graph build (Cognee)'], ['schemas', 'Schema proposals'],
+  ['chunk', 'Chunk + embed'], ['extract', 'Entity extraction'], ['graph', 'Graph build (Context Engine)'], ['schemas', 'Schema proposals'],
 ]
 const now = () => new Date().toISOString()
 const freshSteps = (): RagStep[] => STEP_DEFS.map(([key, label]) => ({ key, label, status: 'queued' }))
@@ -88,7 +103,32 @@ export function createMockRagService({ speed = 1, loadDelay = 300, runner, engin
   const setStep = (key: RagStepKey, patch: Partial<RagStep>) =>
     set({ steps: state.steps.map(s => (s.key === key ? { ...s, ...patch } : s)) })
   const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms * speed))
-  setTimeout(() => set({ loaded: true }), loadDelay * speed)
+
+  async function evaluateContext(customInput?: Partial<ContextJudgeRequest>): Promise<ContextJudgeResult> {
+    set({ contextEvalStatus: 'running' })
+    const facts = contextFacts(state)
+    const entities = NODES.map(n => ({ name: n.label, type: n.okfClass }))
+    const req: ContextJudgeRequest = {
+      sources: customInput?.sources ?? (input?.objects.map(o => ({ name: o, type: o.split('.').pop()?.toUpperCase() })) ?? JOBS.map(j => ({ name: j.object, type: j.okfClass }))),
+      facts: customInput?.facts ?? facts,
+      entities: customInput?.entities ?? entities,
+      schemas: customInput?.schemas ?? SCHEMAS.map(s => s.name),
+    }
+    try {
+      const res = await layaJudgeContext(req)
+      set({ contextEvaluation: res, contextEvalStatus: 'done' })
+      return res
+    } catch {
+      const res = simulatedContextJudge(req)
+      set({ contextEvaluation: res, contextEvalStatus: 'done' })
+      return res
+    }
+  }
+
+  setTimeout(() => {
+    set({ loaded: true })
+    void evaluateContext()
+  }, loadDelay * speed)
 
   let failAt: RagStepKey | undefined
   let input: RagInput | undefined
@@ -126,6 +166,7 @@ export function createMockRagService({ speed = 1, loadDelay = 300, runner, engin
       setStep(key, { status: 'done', at: now(), detail })
     }
     set({ lastSyncAt: now() })
+    void evaluateContext()
   }
 
   return {
@@ -156,8 +197,15 @@ export function createMockRagService({ speed = 1, loadDelay = 300, runner, engin
       set({ handoffs: [...state.handoffs, h] })
       return h
     },
+    evaluateContext,
+    setContextEvaluation(res: ContextJudgeResult) {
+      set({ contextEvaluation: res, contextEvalStatus: 'done' })
+    },
+    markContextStarted() { if (state.runId) set({ contextStartedRun: state.runId }) },
+    markVerified() { if (state.runId) set({ verifiedRun: state.runId }) },
   }
 }
+
 
 // VITE_RAG_BACKEND=cognee runs the pipeline on a real Cognee server (proxied at /cognee by Vite; see vite.config.ts).
 const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {}
@@ -170,3 +218,12 @@ export const useRag = <T,>(select: (s: RagState) => T) =>
 
 export const isRunning = (s: RagState) => s.steps.some(x => x.status === 'running')
 export const stepStatus = (s: RagState, key: RagStepKey) => s.steps.find(x => x.key === key)!.status
+
+/** One fixed viewport per canvas size: the root's centre lands on the canvas centre, and the scale fits the farthest
+ *  node (centre distance + radius) from the root, with padding. No fitView: a bounding-box fit would move the root. */
+export function centredViewport(pts: { x: number; y: number; r: number }[], root: { x: number; y: number }, w: number, h: number, pad = 28, maxZoom = 1.2) {
+  let ex = 1, ey = 1
+  for (const p of pts) { ex = Math.max(ex, Math.abs(p.x - root.x) + p.r); ey = Math.max(ey, Math.abs(p.y - root.y) + p.r) }
+  const zoom = Math.max(0.05, Math.min(maxZoom, (w / 2 - pad) / ex, (h / 2 - pad) / ey))
+  return { x: w / 2 - root.x * zoom, y: h / 2 - root.y * zoom, zoom }
+}

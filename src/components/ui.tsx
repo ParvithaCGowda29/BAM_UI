@@ -1,7 +1,9 @@
-import { createContext, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
-import { setUi, toast, useUi } from '../lib/store'
+import { cloneElement, createContext, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from 'react'
+import { IconPlayerPlay, IconRobot, IconDots, IconAlertCircle, IconFolder, IconFiles, IconFileZip, IconMicrophone, IconMicrophoneOff, IconPlayerStop, IconLoader, IconInbox, IconGitBranch, IconBriefcase, IconShieldCheck, IconUpload, IconTransform, IconFileCode, IconClipboardCheck, IconRefresh, IconSearch, IconSchema, IconTarget, IconTable, IconTemplate, IconCode, IconBox, IconListCheck, IconCertificate, IconDatabaseImport, IconPhoto, IconPencil, IconTrash, IconX, IconDeviceFloppy, IconCopy, IconCheck, IconThumbUp, IconThumbDown, IconPlus, IconPlayerStopFilled, IconFileText, IconSend, IconArrowRight, IconAlertTriangle, IconFile, IconChevronDown, IconArrowDown, type TablerIcon } from '@tabler/icons-react'
+import { setUi, useUi } from '../lib/store'
 import type { RunStatus, Stage, StepState } from '../api/types'
 import { BAM_ACTIONS, SUCCESS_MS, actionView, isNewSuccess, type BamAction } from '../lib/bamUi.ts'
+import bullLogo from '../assets/login/bull-head-transparent.png'
 
 // ---- icons (inline, 16px, currentColor) --------------------------------------
 const paths: Record<string, ReactNode> = {
@@ -38,12 +40,106 @@ const paths: Record<string, ReactNode> = {
   doccheck: <><path d="M4 2h5l3 3v9H4z" /><path d="M9 2v3h3M6 10l1.5 1.5L10.5 8" /></>,
   save: <><path d="M3 3h8l2 2v8H3z" /><path d="M5.5 3v3h5V3M5.5 13v-3.5h5V13" /></>,
   palette: <><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" /><rect x="9" y="9" width="4.5" height="4.5" rx="1" /></>,
+  // Tabler-style outline icons (local SVG, no icon package): v3 navigation, top bar and Enterprise Assistant.
+  'cloud-up': <><path d="M4.5 12H4a2.8 2.8 0 01-.4-5.6A4 4 0 0111.4 5 3.2 3.2 0 0112 12h-.5" /><path d="M8 13.5V8M6 10l2-2 2 2" /></>,
+  scan: <><path d="M2.5 5V3.5a1 1 0 011-1H5M11 2.5h1.5a1 1 0 011 1V5M13.5 11v1.5a1 1 0 01-1 1H11M5 13.5H3.5a1 1 0 01-1-1V11" /><path d="M2.5 8h11" /></>,
+  clipboard: <><path d="M6 2.5h4v2H6z" /><path d="M10 3.5h1.5a1 1 0 011 1V13a1 1 0 01-1 1h-7a1 1 0 01-1-1V4.5a1 1 0 011-1H6" /><path d="M6 8.5l1.3 1.3L10 7" /></>,
+  plug: <><path d="M5.5 2.5v3M10.5 2.5v3" /><path d="M4 5.5h8v2a4 4 0 01-8 0z" /><path d="M8 11.5v2.5" /></>,
+  bug: <><rect x="5" y="5" width="6" height="8" rx="3" /><path d="M6 5V4a2 2 0 014 0v1M2.5 9H5M11 9h2.5M3 6l2 1M13 6l-2 1M3 12.5l2-1.5M13 12.5l-2-1.5M8 7.5V13" /></>,
+  graph: <><circle cx="4" cy="4" r="1.6" /><circle cx="12" cy="5" r="1.6" /><circle cx="6" cy="12" r="1.6" /><path d="M5.5 4.3l5 .5M4.6 5.5l1 5M10.9 6.2L7.2 10.9" /></>,
+  schema: <><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" /><path d="M2.5 6h11M6.5 6v7.5" /></>,
+  gauge: <><path d="M2.6 11.5a6 6 0 1110.8 0" /><path d="M8 9.5l2.5-3" /><circle cx="8" cy="9.8" r=".9" /></>,
+  briefcase: <><rect x="2" y="5" width="12" height="8.5" rx="1.5" /><path d="M5.5 5V3.8a1.3 1.3 0 011.3-1.3h2.4a1.3 1.3 0 011.3 1.3V5M2 9h12" /></>,
+  'file-text': <><path d="M4 2h5l3 3v9H4z" /><path d="M9 2v3h3M6 8h4M6 10.5h4" /></>,
+  grid: <><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" /><rect x="9" y="9" width="4.5" height="4.5" rx="1" /></>,
+  'circle-check': <><circle cx="8" cy="8" r="5.8" /><path d="M5.6 8.2l1.6 1.6 3.2-3.4" /></>,
+  braces: <><path d="M5.5 2.5H5a1.5 1.5 0 00-1.5 1.5v2.2L2.5 8l1 1.8V12A1.5 1.5 0 005 13.5h.5M10.5 2.5h.5A1.5 1.5 0 0112.5 4v2.2l1 1.8-1 1.8V12a1.5 1.5 0 01-1.5 1.5h-.5" /></>,
+  code: <path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5M9 3L7 13" />,
+  checklist: <><path d="M2.5 4l1 1 2-2M2.5 8.5l1 1 2-2M2.5 13l1 1 2-2" /><path d="M7.5 4.5h6M7.5 9h6M7.5 13.5h6" /></>,
+  flask: <><path d="M6 2.5h4M6.5 2.5v4L3 12.6a1 1 0 00.9 1.4h8.2a1 1 0 00.9-1.4L9.5 6.5v-4" /><path d="M4.5 10h7" /></>,
+  award: <><circle cx="8" cy="6" r="3.8" /><path d="M5.8 9.2L5 14l3-1.6 3 1.6-.8-4.8" /></>,
+  package: <><path d="M8 1.8l5.5 3v6.4L8 14.2l-5.5-3V4.8z" /><path d="M2.5 4.8L8 7.8l5.5-3M8 7.8v6.4M5.2 3.3l5.6 3" /></>,
+  user: <><circle cx="8" cy="5.5" r="2.8" /><path d="M2.8 14a5.2 5.2 0 0110.4 0" /></>,
+  search: <><circle cx="7" cy="7" r="4.5" /><path d="M10.4 10.4L14 14" /></>,
+  send: <><path d="M14 2L7 9M14 2l-4.5 12L7 9 2 6.5z" /></>,
+  paperclip: <path d="M10.5 4.5L5.6 9.4a1.3 1.3 0 001.8 1.8l5-5a2.6 2.6 0 00-3.7-3.7l-5 5a3.9 3.9 0 005.5 5.5l4.3-4.3" />,
+  layout: <><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" /><rect x="9" y="9" width="4.5" height="4.5" rx="1" /></>,
+  table: <><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" /><path d="M2.5 6.5h11M6.5 2.5v11" /></>,
+  menu: <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />,
+  logout: <><path d="M9.5 5V3.5a1 1 0 00-1-1h-5a1 1 0 00-1 1v9a1 1 0 001 1h5a1 1 0 001-1V11" /><path d="M6.5 8h7.5M11.5 5.5L14 8l-2.5 2.5" /></>,
+  'panel-left': <><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M6 2.5v11" /></>,
+  'panel-right': <><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M10 2.5v11" /></>,
+  note: <><path d="M3 2.5h10v8l-3 3H3z" /><path d="M10 13.5v-3h3M5.5 6h5M5.5 8.5h3" /></>,
+  plus: <path d="M8 3.5v9M3.5 8h9" />,
+  info: <><circle cx="8" cy="8" r="5.8" /><path d="M8 7.2v3.8M8 5v.2" /></>,
+  mic: <><rect x="6" y="2" width="4" height="7.5" rx="2" /><path d="M3.8 7.5a4.2 4.2 0 008.4 0M8 11.7V14" /></>,
+  play: <path d="M5 3.5v9l7.5-4.5z" />,
+  folder: <path d="M2.5 4.5a1 1 0 011-1h3l1.5 1.5h4.5a1 1 0 011 1v6a1 1 0 01-1 1h-9a1 1 0 01-1-1z" />,
+  zip: <><path d="M4 2h5l3 3v9H4z" /><path d="M9 2v3h3M7 4h1M7 6h1M7 8h1" /><rect x="6.5" y="9.5" width="2" height="2.5" rx=".5" /></>,
+  download: <><path d="M8 3v7.5M4.8 7.5L8 10.7l3.2-3.2" /><path d="M3 12.5V13h10v-.5" /></>,
+  gear: <><circle cx="8" cy="8" r="2.5" /><path d="M13.2 9.5a1.2 1.2 0 00.2 1.3l.1.1a1.2 1.2 0 01-1.7 1.7l-.1-.1a1.2 1.2 0 00-1.3-.2 1.2 1.2 0 00-.7 1.1V14a1.2 1.2 0 01-2.4 0v-.6a1.2 1.2 0 00-.8-1.1 1.2 1.2 0 00-1.3.2l-.1.1a1.2 1.2 0 01-1.7-1.7l.1-.1a1.2 1.2 0 00.2-1.3 1.2 1.2 0 00-1.1-.7H2a1.2 1.2 0 010-2.4h.6a1.2 1.2 0 001.1-.8 1.2 1.2 0 00-.2-1.3l-.1-.1a1.2 1.2 0 011.7-1.7l.1.1a1.2 1.2 0 001.3.2 1.2 1.2 0 00.7-1.1V2a1.2 1.2 0 012.4 0v.6a1.2 1.2 0 00.8 1.1 1.2 1.2 0 001.3-.2l.1-.1a1.2 1.2 0 011.7 1.7l-.1.1a1.2 1.2 0 00-.2 1.3 1.2 1.2 0 001.1.7H14a1.2 1.2 0 010 2.4h-.6a1.2 1.2 0 00-1.1.8z" /></>,
 }
 
-export function Icon({ name, size = 16, spin, label }: { name: keyof typeof paths | string; size?: number; spin?: boolean; label?: string }) {
+// Workflow stage and step icons (15 Oct 2026, BuLLM icon map): Tabler outline icons from @tabler/icons-react
+// (MIT, tabler.io), 24×24 grid, stroke 2, currentColor, under a `tb-` prefix in the one shared registry.
+const tabler: Record<string, TablerIcon> = {
+  'tb-player-play': IconPlayerPlay,
+  'tb-robot': IconRobot,
+  'tb-dots': IconDots,
+  'tb-alert-circle': IconAlertCircle,
+  'tb-folder': IconFolder,
+  'tb-files': IconFiles,
+  'tb-file-zip': IconFileZip,
+  'tb-microphone': IconMicrophone,
+  'tb-microphone-off': IconMicrophoneOff,
+  'tb-player-stop': IconPlayerStop,
+  'tb-loader': IconLoader,
+  'tb-inbox': IconInbox,
+  'tb-git-branch': IconGitBranch,
+  'tb-briefcase': IconBriefcase,
+  'tb-shield-check': IconShieldCheck,
+  'tb-upload': IconUpload,
+  'tb-transform': IconTransform,
+  'tb-file-code': IconFileCode,
+  'tb-clipboard-check': IconClipboardCheck,
+  'tb-refresh': IconRefresh,
+  'tb-search': IconSearch,
+  'tb-schema': IconSchema,
+  'tb-target': IconTarget,
+  'tb-table': IconTable,
+  'tb-template': IconTemplate,
+  'tb-code': IconCode,
+  'tb-box': IconBox,
+  'tb-list-check': IconListCheck,
+  'tb-certificate': IconCertificate,
+  'tb-database-import': IconDatabaseImport,
+  'tb-photo': IconPhoto,
+  'tb-pencil': IconPencil,
+  'tb-trash': IconTrash,
+  'tb-x': IconX,
+  'tb-device-floppy': IconDeviceFloppy,
+  'tb-copy': IconCopy,
+  'tb-check': IconCheck,
+  'tb-thumb-up': IconThumbUp,
+  'tb-thumb-down': IconThumbDown,
+  'tb-plus': IconPlus,
+  'tb-arrow-right': IconArrowRight,
+  'tb-alert-triangle': IconAlertTriangle,
+  'tb-file': IconFile,
+  'tb-chevron-down': IconChevronDown,
+  'tb-arrow-down': IconArrowDown,
+  'tb-player-stop-filled': IconPlayerStopFilled,
+  'tb-file-text': IconFileText,
+  'tb-send': IconSend,
+}
+
+export function Icon({ name, size = 16, spin, label, stroke }: { name: keyof typeof paths | string; size?: number; spin?: boolean; label?: string; stroke?: number }) {
+  const Tb = tabler[name]
+  const a11y = { 'aria-hidden': label ? undefined : true, role: label ? 'img' : undefined, 'aria-label': label }
+  if (Tb) return <Tb className={spin ? 'icon spin' : 'icon'} size={size} stroke={stroke ?? 2} {...a11y} />
   return (
     <svg className={spin ? 'icon spin' : 'icon'} width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden={label ? undefined : true} role={label ? 'img' : undefined} aria-label={label}>
+      strokeWidth={stroke ?? 1.6} strokeLinecap="round" strokeLinejoin="round" {...a11y}>
       {paths[name]}
     </svg>
   )
@@ -97,8 +193,8 @@ export function Time({ iso, prefix }: { iso?: string; prefix?: string }) {
 /** A long value (path, hash, URI) shown ellipsized, with the full value in a tooltip and a copy button that copies the original. */
 export function Copy({ value, display, label = 'value', className = '' }: { value: string; display?: string; label?: string; className?: string }) {
   const copy = async () => {
-    try { await navigator.clipboard.writeText(value); toast(`Copied ${label}: ${value.length > 48 ? `${value.slice(0, 48)}…` : value}`, 'success') }
-    catch (e) { toast(`Could not copy the ${label}: ${(e as Error).message || 'clipboard unavailable'}. Select the text in the tooltip instead.`, 'error') }
+    try { await navigator.clipboard.writeText(value) }
+    catch (e) { console.error(`Could not copy the ${label}:`, (e as Error).message || 'clipboard unavailable') }
   }
   return (
     <span className={`copyable ${className}`}>
@@ -163,7 +259,36 @@ export function Pane({ title, kicker, actions, footer, children, className, id }
   )
 }
 
-export function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
+/** One compact summary card (Ingestion screens): icon, title, one line of live counts, optional link row. */
+export function OverviewCard({ icon, title, line, tone, link }: {
+  icon: string; title: string; line: ReactNode; tone?: 'warn' | 'err' | 'ok'; link?: { label: string; action: string; onClick: () => void }
+}) {
+  return (
+    <section className={`ing-ov ${tone ? `tone-${tone}` : ''}`} aria-live="polite">
+      <div className="ing-ov-main">
+        <Icon name={icon} size={16} />
+        <div><h3>{title}</h3><p className="muted xs">{line}</p></div>
+      </div>
+      {link && <div className="ing-ov-link"><span className="sm">{link.label}</span>
+        <button className="link sm" onClick={link.onClick}>{link.action}<Icon name="chevron" size={12} /></button></div>}
+    </section>
+  )
+}
+
+/** v3 stat tiles: live values only (never fixed wireframe numbers). `tone` pairs with the label text, never colour alone. */
+export function Kpis({ items, label }: { items: { value: ReactNode; label: string; tone?: 'ok' | 'warn' | 'err' }[]; label: string }) {
+  return (
+    <dl className="kpis" aria-label={label}>
+      {items.map(k => (
+        <div key={k.label} className={`kpi ${k.tone ? `kpi-${k.tone}` : ''}`}>
+          <dt>{k.label}</dt><dd>{k.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+export function Section({ title, children, aside }:{ title: string; children: ReactNode; aside?: ReactNode }) {
   return (
     <div className="section">
       <div className="section-head"><h3>{title}</h3>{aside}</div>
@@ -214,23 +339,55 @@ export function Banner({ tone, icon, children, action }: { tone: 'info' | 'warn'
   )
 }
 
-// A gate button: when disabled it says why, right next to it.
-export function GateButton({ children, reason, onClick, variant = 'primary', busy, icon, action, successKey }: {
+// Hover (after ~300 ms) or keyboard focus shows what the button does, above it and aligned to its right edge; blur,
+// mouse leave and Escape hide it. `note` is the second line (why it is disabled, or what is running). Never takes focus.
+export function Tip({ text, note, children }: { text: string; note?: string; children: ReactElement<{ 'aria-describedby'?: string }> }) {
+  const id = useId()
+  const [open, setOpen] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  const show = (ms: number) => { clearTimeout(timer.current); timer.current = window.setTimeout(() => setOpen(true), ms) }
+  const hide = () => { clearTimeout(timer.current); setOpen(false) }
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const describedBy = [children.props['aria-describedby'], id].filter(Boolean).join(' ')
+  return (
+    <span className="tip-wrap" onMouseEnter={() => show(300)} onMouseLeave={hide} onFocus={() => show(0)} onBlur={hide}
+      onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); hide() } }}>
+      {cloneElement(children, { 'aria-describedby': describedBy })}
+      <span role="tooltip" id={id} className="tip" hidden={!open}>{text}{note && <span className="tip-note">{note}</span>}</span>
+    </span>
+  )
+}
+
+/** A step that runs on its own (`mode: 'automated'` in trackerConfig): robot chip, "Automated" on hover/focus. */
+// The BuLLM bull glyph for automated steps; the label comes from the parent chip.
+export function AutomatedIcon() {
+  return <img className="auto-icon" src={bullLogo} alt="" aria-hidden="true" draggable={false} />
+}
+
+export function AutoChip({ className = '' }: { className?: string }) {
+  return <Tip text="Automated"><span className={`auto-chip ${className}`} tabIndex={0} aria-label="Automated"><AutomatedIcon /></span></Tip>
+}
+
+// A gate button: when disabled it says why, right next to it. With `tip`, it also explains itself on hover/focus.
+export function GateButton({ children, reason, onClick, variant = 'primary', busy, icon, action, successKey, tip, tipReason, tipBusy }: {
   children: ReactNode; reason?: string; onClick: () => unknown; variant?: 'primary' | 'secondary' | 'danger'; busy?: boolean; icon?: string
   /** One of the six BAM actions: renders the orange BamActionButton (loading / success labels) with the same gate reason. */
   action?: BamAction; successKey?: unknown
+  /** Tooltip copy (lib/actionTips.ts `tips()`): what a click does, the disabled reason override, the running text. */
+  tip?: string; tipReason?: string; tipBusy?: string
 }) {
   const disabled = !!reason || busy
   // A disabled gate always says why; while its own action runs, that is "Working…".
   const why = reason ?? (busy && !action ? 'Working…' : undefined)
   const id = useId()
+  const btn = action ? <BamActionButton action={action} busy={busy} blocked={!!reason} successKey={successKey} onClick={onClick} aria-describedby={why ? id : undefined}>{children}</BamActionButton> : <button className={`btn btn-${variant}`} aria-disabled={disabled || undefined}
+    onClick={() => { if (!disabled) onClick() }} aria-describedby={why ? id : undefined}>
+    {busy ? <Icon name="spinner" spin /> : icon && <Icon name={icon} />}
+    {children}
+  </button>
   return (
     <span className="gate">
-      {action ? <BamActionButton action={action} busy={busy} blocked={!!reason} successKey={successKey} onClick={onClick} aria-describedby={why ? id : undefined}>{children}</BamActionButton> : <button className={`btn btn-${variant}`} aria-disabled={disabled || undefined}
-        onClick={() => { if (!disabled) onClick() }} aria-describedby={why ? id : undefined}>
-        {busy ? <Icon name="spinner" spin /> : icon && <Icon name={icon} />}
-        {children}
-      </button>}
+      {tip ? <Tip text={tip} note={busy ? tipBusy : reason ? tipReason ?? reason : undefined}>{btn}</Tip> : btn}
       {why && <span className="gate-reason" id={id}><Icon name={reason ? 'lock' : 'spinner'} size={12} spin={!reason} />{why}</span>}
     </span>
   )

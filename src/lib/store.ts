@@ -4,15 +4,13 @@ import { api } from '../api/adapter'
 import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES } from '../api/types'
 import { initialStatuses, type Statuses } from '../tracker/trackerConfig.ts'
 import { localTrackerStorage } from '../tracker/trackerStorage.ts'
+import { addFilesLocked } from './goal.ts'
 
 // UI-only state: what the viewer is looking at. Process state lives in the backend snapshot.
-/** `screen` is the screen ID the toast links to (e.g. '3.1'). */
-export interface Toast { id: number; tone: 'info' | 'success' | 'error'; text: string; screen?: string; key?: string }
-
 export interface Ui {
   theme: 'dark' | 'light'
   env: 'FDE' | 'Staging'
-  toasts: Toast[]
+  settingsOpen: boolean
   passage?: string
   codeFocus?: { file: string; line?: number }
   /** Collapsed side panes in the 3-pane workbench screens. */
@@ -24,6 +22,20 @@ export interface Ui {
   fileDetail?: string
   /** Skill selected in 3.3 Skills/code review. */
   reviewSkill?: string
+  /** FDE Intake Objectives & Scope Directives (typed or Windows Voice-to-Text). */
+  fdeGoals?: string
+  /** v3 shell: collapsed NAVIGATE and Enterprise Assistant panes (saved as `bam-shell-v2`). */
+  shell: { nav: boolean; assistant: boolean }
+  /** Narrow screens: which shell pane is open as an overlay drawer. */
+  drawer: 'nav' | 'assistant' | null
+  /** Usage & improvement filters (kept while you move around the app). */
+  usage: { client: string; workflow: string; range: '7d' | '30d' | '90d' }
+  /** Improvement notes (Usage & improvement). Proposals only: they never change the workflow. Saved as `bam-improvement-notes`. */
+  notes: { id: string; text: string; at: string }[]
+  /** Schemas: the schema open on screen (field edits typed in the assistant apply to it). */
+  ragSchema?: string
+  /** A question a screen puts to the assistant (a graph node click): appended to the thread once per id. */
+  assistantAsk?: { id: number; text: string }
 }
 
 // Manual progress tracker; lives in the same store the stepper navigates with.
@@ -44,21 +56,44 @@ export interface TrackerState {
 export const trackerStorage = localTrackerStorage()
 
 const saved = (() => { try { return localStorage.getItem('bam-theme') } catch { return null } })()
-const savedPanes = (() => { try { return JSON.parse(localStorage.getItem('bam-panes') ?? 'null') as Ui['collapsed'] | null } catch { return null } })()
+const savedPanes = (() => { try { return JSON.parse(localStorage.getItem('bam-panes-v3') ?? 'null') as Ui['collapsed'] | null } catch { return null } })()
+const savedGoals = (() => { try { return localStorage.getItem('bam-fde-goals') ?? '' } catch { return '' } })()
+// `bam-shell-v2` (21 Oct 2026): the old `bam-shell` held states written by the removed stage auto-collapse, so it is ignored
+// and everyone starts expanded; from now on only the person's own Hide / Show choice is saved.
+const savedShell = (() => { try { localStorage.removeItem('bam-shell'); return JSON.parse(localStorage.getItem('bam-shell-v2') ?? 'null') as Ui['shell'] | null } catch { return null } })()
+const savedNotes = (() => { try { return JSON.parse(localStorage.getItem('bam-improvement-notes') ?? '[]') as Ui['notes'] } catch { return [] } })()
 let state: Ui = {
-  theme: saved === 'light' || saved === 'dark' ? saved : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark',
-  env: 'FDE', toasts: [],
-  collapsed: { left: savedPanes?.left === true, right: savedPanes?.right === true },
+  // v3: light is the default visual target; a saved choice (dark or light) still wins.
+  theme: saved === 'light' || saved === 'dark' ? saved : 'light',
+  env: 'FDE', settingsOpen: false,
+  // v3: the 3 panes sit inside Results & edits, so the side panes start collapsed (rails) until the user opens them.
+  collapsed: { left: savedPanes ? savedPanes.left : true, right: savedPanes ? savedPanes.right : true },
   tracker: { statuses: initialStatuses(), basis: {}, evidence: initialStatuses(), previous: [], openTask: null, selected: null, loaded: false },
   rejected: [],
+  fdeGoals: savedGoals,
+  shell: { nav: savedShell?.nav === true, assistant: savedShell?.assistant === true },
+  drawer: null,
+  usage: { client: 'all', workflow: 'all', range: '30d' },
+  notes: Array.isArray(savedNotes) ? savedNotes : [],
 }
 const subs = new Set<() => void>()
+
+/** No notification UI (removed 9 Oct 2026): ported repo code still calls toast(); failures are logged, the rest is dropped. */
+export function toast(text: string, tone: 'info' | 'success' | 'error' = 'info', _screen?: string, _key?: string) {
+  if (tone === 'error') console.error(text)
+}
+
+export const openSettings = () => setUi({ settingsOpen: true })
+export const closeSettings = () => setUi({ settingsOpen: false })
 
 export function setUi(patch: Partial<Ui> | ((s: Ui) => Partial<Ui>)) {
   state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) }
   try {
     localStorage.setItem('bam-theme', state.theme)
-    localStorage.setItem('bam-panes', JSON.stringify(state.collapsed))
+    localStorage.setItem('bam-panes-v3', JSON.stringify(state.collapsed))
+    localStorage.setItem('bam-shell-v2', JSON.stringify(state.shell))
+    localStorage.setItem('bam-improvement-notes', JSON.stringify(state.notes))
+    if (state.fdeGoals !== undefined) localStorage.setItem('bam-fde-goals', state.fdeGoals)
   } catch { /* storage blocked */ }
   subs.forEach(f => f())
 }
@@ -69,16 +104,6 @@ export const useUi = <T,>(select: (s: Ui) => T) =>
   useSyncExternalStore(cb => { subs.add(cb); return () => { subs.delete(cb) } }, () => select(state))
 
 void trackerStorage.load().then(r => setUi(s => ({ tracker: { ...s.tracker, statuses: r.statuses, basis: r.basis, loaded: true, storageError: r.error } })))
-
-let toastId = 0
-/** A toast with the same `key` (or the same text) replaces the earlier one instead of stacking. */
-export function toast(text: string, tone: Toast['tone'] = 'info', screen?: string, key?: string) {
-  const id = ++toastId
-  setUi(s => ({ toasts: [...s.toasts.filter(t => (key ? t.key !== key : true) && t.text !== text), { id, tone, text, screen, key }] }))
-  // Errors stay until dismissed; never auto-dismiss a failure.
-  if (tone !== 'error') setTimeout(() => dismissToast(id), 6000)
-}
-export const dismissToast = (id: number) => setUi(s => ({ toasts: s.toasts.filter(t => t.id !== id) }))
 
 // One Uppy instance for the app's lifetime, so uploads keep running when the modal closes.
 export const uppy = new Uppy({
@@ -97,7 +122,8 @@ uppy.addUploader(async fileIDs => {
 
 async function send(f: ReturnType<typeof uppy.getFile>) {
     try {
-      const rec = await api.uploadFile({ name: f.name ?? 'file', size: f.size ?? 0 }, (loaded, total) =>
+      const batchId = (f.meta as any)?.batchId as string | undefined
+      const rec = await api.uploadFile({ name: f.name ?? 'file', size: f.size ?? 0, batchId }, (loaded, total) =>
         uppy.emit('upload-progress', uppy.getFile(f.id), { uploadStarted: Date.now(), bytesUploaded: loaded, bytesTotal: total }))
       uppy.emit('upload-success', uppy.getFile(f.id), { status: 200, body: rec as never, uploadURL: rec.objectKey })
     } catch (e) {
@@ -106,21 +132,28 @@ async function send(f: ReturnType<typeof uppy.getFile>) {
 }
 
 /** Browse/drop in 1.1: add files to the shared Uppy instance (type/size restrictions apply) and upload right away. */
-export function uploadFiles(list: FileList | File[]) {
+export function uploadFiles(list: FileList | File[], batchId?: string) {
+  if (addFilesLocked()) return // the last guard: nothing uploads before the goal is approved
   const done = uppy.getFiles().filter(f => f.progress.uploadComplete).map(f => f.id)
   if (done.length) uppy.removeFiles(done)
   uppy.setOptions({ restrictions: { maxNumberOfFiles: null } })
   let added = 0
   for (const f of list) {
-    try { uppy.addFile({ name: f.name, type: f.type, data: f, source: 'intake' }); added++ } catch { /* restriction-failed already reported */ }
+    try {
+      uppy.addFile({
+        name: f.name,
+        type: f.type,
+        data: f,
+        source: 'intake',
+        meta: { batchId: (f as any).batchId || batchId },
+      })
+      added++
+    } catch { /* restriction-failed already reported */ }
   }
   if (added) void uppy.upload()
 }
 
-uppy.on('complete', r => {
-  if (r.successful?.length) toast(`${r.successful.length} file(s) uploaded to quarantine. Virus scans started.`, 'success', '1.1')
-  if (r.failed?.length) toast(`${r.failed.length} upload(s) failed. See the upload list in 1.1.`, 'error', '1.1')
-})
 const reject = (name: string, reason: string) => setUi(s => ({ rejected: [...s.rejected, { name, reason, at: new Date().toISOString() }] }))
-uppy.on('restriction-failed', (file, err) => { reject(file?.name ?? 'File', err.message); toast(`${file?.name ?? 'File'} rejected: ${err.message}`, 'error', '1.4') })
+// Refused and failed files are listed in 1.1/1.2/1.4 (no notices, removed 9 Oct 2026).
+uppy.on('restriction-failed', (file, err) => reject(file?.name ?? 'File', err.message))
 uppy.on('upload-error', (file, err) => { if (file) reject(file.name ?? 'File', err?.message ?? 'Upload failed') })

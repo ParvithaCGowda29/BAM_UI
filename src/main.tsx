@@ -1,6 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
+import './v3.css'
+import './ingestion.css'
+import './declutter.css'
+import './rag-seamless.css'
 import App from './App'
 
 const root = createRoot(document.getElementById('root')!)

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { actionView, isNewSuccess, stageMarkers } from './bamUi.ts'
+import { BAM_ACTIONS, actionView, isNewSuccess, plural, stageMarkers } from './bamUi.ts'
 
 test('action button: loading locks, success is transient and never overrides eligibility', () => {
   assert.deepEqual(actionView({ busy: true }), { phase: 'loading', locked: true })
@@ -41,4 +41,15 @@ test('tracker: blocked and needs review stay unresolved, never done', () => {
   assert.equal(r.markers[1].status, 'needs_review')
   assert.equal(r.markers[2].status, 'blocked')
   assert.deepEqual(r.earned, [true, false, false])
+})
+
+test('Certify (review) says what it does while running', () => {
+  assert.equal(BAM_ACTIONS.review.loading, 'Signing off…')
+  assert.equal(actionView({ busy: true }).locked, true, 'disabled while signing off')
+})
+
+test('plural: singular only for exactly one', () => {
+  assert.equal(plural(1, 'file'), '1 file')
+  assert.equal(plural(0, 'file'), '0 files')
+  assert.equal(plural(2, 'batch', 'batches'), '2 batches')
 })

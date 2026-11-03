@@ -1,5 +1,5 @@
 // What actually blocks a locked screen, derived from backend + RAG state. The reason text and the
-// button target come from the same check, so a lock never says "approve in 3.1" while sending you to 1.1.
+// button target come from the same check, so a lock never says "approve the SOW" while sending you to Upload.
 import type { Snapshot, StepId } from '../api/types'
 import type { RagState } from '../rag/ragPipeline.ts'
 
@@ -8,36 +8,36 @@ export interface Blocker { reason: string; label: string; target: string }
 /** The first unmet prerequisite for working on backend step `step`, or undefined when nothing blocks it. */
 export function prerequisite(snap: Snapshot, rag: Pick<RagState, 'runId' | 'steps'>, step: StepId): Blocker | undefined {
   if (!snap.uploads.length) return { reason: 'Source documents are needed first. The SOW is generated from the RAG context of the uploaded documents.', label: 'Upload documents', target: '1.1' }
-  if (!snap.ingestion) return { reason: 'Documents are uploaded but have not entered RAG. Only virus-scanned, verified files can: start the ingestion run in 1.1.', label: 'Open 1.1 Intake console', target: '1.1' }
+  if (!snap.ingestion) return { reason: 'Documents are uploaded but not standardized yet. Standardize hands them on once every file is ready.', label: 'Open Standardize', target: '1.8' }
 
   const sow = snap.sow
   const genFailed = snap.sowGeneration.find(s => s.status === 'failed')
   const generating = snap.sowGeneration.some(s => s.status === 'running' || s.status === 'queued')
   if (!sow) {
-    if (genFailed) return { reason: `SOW generation failed at "${genFailed.label}": ${genFailed.error ?? 'no reason reported'}`, label: 'Open 3.1 to retry', target: '3.1' }
-    if (generating) return { reason: 'The SOW is being generated from the RAG context. It needs review and approval in 3.1 when it is ready.', label: 'Open 3.1', target: '3.1' }
+    if (genFailed) return { reason: `SOW generation failed at "${genFailed.label}": ${genFailed.error ?? 'no reason reported'}`, label: 'Open Scope to retry', target: '3.1' }
+    if (generating) return { reason: 'The SOW is being generated from the context. It needs review and approval in Scope when it is ready.', label: 'Open Scope', target: '3.1' }
     const ragFailed = rag.steps.find(s => s.status === 'failed')
-    if (ragFailed) return { reason: `The RAG pipeline failed at "${ragFailed.label}", so no SOW has been generated yet.`, label: 'Open 2.1 to retry', target: '2.1' }
+    if (ragFailed) return { reason: `The context build failed at "${ragFailed.label}", so no SOW has been generated yet.`, label: 'Open Parse to retry', target: '1.9' }
     return {
-      reason: rag.runId ? 'The RAG context is still being built. The SOW is generated automatically when it is ready.' : 'Documents are stored but the RAG context has not been built yet, so no SOW exists.',
-      label: 'Open 2.1 context pipeline', target: '2.1',
+      reason: rag.runId ? 'The context is still being built. The SOW is generated automatically when it is ready.' : 'Documents are stored but the context has not been built yet, so no SOW exists.',
+      label: rag.runId ? 'Open Index' : 'Open Parse', target: rag.runId ? '2.1' : '1.9',
     }
   }
   if (step === 1) return undefined
 
-  if (sow.status === 'regenerating') return { reason: `SOW v${sow.changeRequest?.version ?? sow.version} is being regenerated with AI. Review and approve the new version in 3.1.`, label: 'Review SOW', target: '3.1' }
-  if (sow.status !== 'approved' || !sow.approval) return { reason: `SOW v${sow.version} is a draft awaiting approval. Approve it in 3.1 to unlock the skills grid.`, label: 'Review SOW', target: '3.1' }
+  if (sow.status === 'regenerating') return { reason: `SOW v${sow.changeRequest?.version ?? sow.version} is being regenerated with AI. Review and approve the new version in Scope.`, label: 'Open Scope', target: '3.1' }
+  if (sow.status !== 'approved' || !sow.approval) return { reason: `SOW v${sow.version} is a draft awaiting approval. Approve it in Scope to unlock the Grid.`, label: 'Open Scope', target: '3.1' }
   if (step === 2) return undefined
 
   const wf = snap.workflow
   if (!wf) return {
-    reason: snap.gridReviewedAt ? 'The grid is reviewed; generate the ISATVON Contract in 3.2 to start validation.' : 'Review the skills grid in 3.2, then generate the ISATVON Contract to start validation.',
-    label: 'Open 3.2', target: '3.2',
+    reason: snap.gridReviewedAt ? 'The grid is reviewed; generate the ISATVON Contract in Grid to produce the manifest.' : 'Review the Grid, then generate the ISATVON Contract to produce the manifest.',
+    label: 'Open Grid', target: '3.2',
   }
   if (step === 3) return undefined
 
-  if (wf.status === 'running') return { reason: 'The Temporal validation workflow is still running.', label: 'Open 4.1', target: '4.1' }
-  if (wf.status === 'failed') return { reason: `Validation failed: ${wf.activities.find(a => a.status === 'failed')?.reason ?? 'see 4.1'}`, label: 'Open 4.1', target: '4.1' }
-  if (!wf.manifest || wf.approval?.hash !== wf.manifest.hash) return { reason: 'Approve the manifest and code to unlock testing.', label: 'Review manifest', target: '4.2' }
+  if (wf.status === 'running') return { reason: 'The check activities that write the manifest and translated code are still running.', label: 'Open Template', target: '4.2' }
+  if (wf.status === 'failed') return { reason: `Translation failed: ${wf.activities.find(a => a.status === 'failed')?.reason ?? 'see the validation activities'}`, label: 'Open Translate', target: '4.3' }
+  if (!wf.manifest || wf.approval?.hash !== wf.manifest.hash) return { reason: 'Review Template and Translate, then Approve in Translate to approve this manifest and its code.', label: 'Open Translate', target: '4.3' }
   return undefined
 }

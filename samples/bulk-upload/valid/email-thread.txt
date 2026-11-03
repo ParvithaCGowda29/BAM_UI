@@ -1,0 +1,5 @@
+From: buyer@meridian.example
+Subject: RE: RFQ-2026-0147
+
+Rev C replaces Rev B on line 2 (qty bump to 120). Lead time 4 wks ARO is acceptable for line 1.
+Please confirm EN 10204 3.1 certs for the housing material.

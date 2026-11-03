@@ -2,21 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/adapter'
-import { isReleased } from '../api/scanGate.ts'
 import type { Sow } from '../api/types'
 import type { StepProps } from '../App'
 import { useAction } from '../lib/data'
-import { setUi, useUi } from '../lib/store'
-import { DemoTag } from '../components/release'
+import { useUi } from '../lib/store'
 import { goScreen, goStep } from '../lib/route'
 import { isRunning, ragPipeline, useRag } from '../rag/ragPipeline.ts'
 import { ChangeHighlight, DiffLegend, SowMeta, setChangeBase, sowExtensions, useSowDiff } from '../components/sow'
 import { editCount } from '../lib/sowDiff'
 import { sowComparison, type CompareWith } from '../lib/sowCompare'
-import { Banner, Copy, Empty, ErrorState, GateButton, Icon, Pane, Section, Skeleton, StageList, StatusPill, fmtTime } from '../components/ui'
+import { Banner, Empty, ErrorState, GateButton, Icon, Pane, Skeleton, StatusPill, fmtTime } from '../components/ui'
+import { tips } from '../lib/actionTips'
+import { VisualsPanel } from './Visuals'
+import './visuals.css'
 
 
-function Toolbar({ editor }: { editor: Editor }) {
+export function Toolbar({ editor, label = 'SOW formatting' }: { editor: Editor; label?: string }) {
   const st = useEditorState({ editor, selector: ({ editor: e }) => ({
     bold: e.isActive('bold'), italic: e.isActive('italic'), h2: e.isActive('heading', { level: 2 }), h3: e.isActive('heading', { level: 3 }),
     ul: e.isActive('bulletList'), ol: e.isActive('orderedList'), undo: e.can().undo(), redo: e.can().redo(), editable: e.isEditable,
@@ -25,7 +26,7 @@ function Toolbar({ editor }: { editor: Editor }) {
     <button className="tb" aria-label={label} title={label} aria-pressed={on} disabled={!st.editable || disabled} onClick={fn}>{text}</button>
   )
   return (
-    <div className="toolbar" role="toolbar" aria-label="SOW formatting">
+    <div className="toolbar" role="toolbar" aria-label={label}>
       {b('Bold', 'B', st.bold, () => editor.chain().focus().toggleBold().run())}
       {b('Italic', 'I', st.italic, () => editor.chain().focus().toggleItalic().run())}
       <span className="tb-sep" />
@@ -106,7 +107,7 @@ function SowEditor({ sow, editable, info }: { sow: Sow; editable: boolean; info:
   const editsText = cmp.kind === 'none' ? 'First version: nothing to compare' : `${edits ? `${edits} change${edits === 1 ? '' : 's'}` : 'No changes'} · ${cmp.from} → ${cmp.to}`
 
   return (
-    <Pane id="center-title" kicker="3.1 · Human review" title="SOW draft" className="center"
+    <Pane id="center-title" kicker="SOW review and FDE approval" title="Scope" className="center"
       actions={<span className="row">
         <label className="switch" title="Colour-code changes in the document">
           <input type="checkbox" role="switch" checked={showDiff} onChange={e => setShowDiff(e.target.checked)} />
@@ -130,15 +131,16 @@ function SowEditor({ sow, editable, info }: { sow: Sow; editable: boolean; info:
               : save.s === 'error' ? `Not saved: ${save.err}` : `Updated ${fmtTime(sow.updatedAt)}`}
             {cmp.kind === 'diff' && edits > 0 && ` · ${edits} change${edits === 1 ? '' : 's'}, ${cmp.from} → ${cmp.to} (${diff.counts.added} added, ${diff.counts.removed} removed, ${diff.counts.modified} modified)`}
           </span>
-          {!approved && !decideReason && <span className="muted sm">Approving v{sow.version} unlocks 3.2 and extracts skills from this exact version.</span>}
+          {!approved && !decideReason && <span className="muted sm">Approving v{sow.version} unlocks the Grid and extracts skills from this exact version.</span>}
         </div>
         <div className="row">
-          {approved && info.editable && <button className="btn btn-ghost" disabled={!!busy}
-            onClick={() => run('Close SOW review', () => api.closeReopen(1), { step: 1 }).then(() => goStep(2))}>Keep approval and close</button>}
-          <GateButton action="approve" reason={approveReason} busy={busy === 'Approve'} successKey={sow.approval?.version}
-            onClick={() => run('Approve', () => api.approveSow(sow.version), { success: `SOW v${sow.version} approved. Skills extraction started in 3.2.`, step: 2 }).then(() => goStep(2))}>
-            Approve v{sow.version}
-          </GateButton>
+          <GateButton variant="secondary" icon="edit" {...tips('3.1', 'Edit')} reason={decideReason} onClick={() => editor?.commands.focus('end')}>Edit</GateButton>
+          {/* Reopened with a still-valid approval: Approve keeps it and closes the review (no second approval). */}
+          {approved && info.editable
+            ? <GateButton action="approve" {...tips('3.1', 'Approve')} reason={decideReason} busy={busy === 'Close SOW review'}
+                onClick={() => run('Close SOW review', () => api.closeReopen(1), { step: 1 }).then(() => goStep(2))}>Approve</GateButton>
+            : <GateButton action="approve" {...tips('3.1', 'Approve')} reason={approveReason} busy={busy === 'Approve'} successKey={sow.approval?.version}
+                onClick={() => run('Approve', () => api.approveSow(sow.version), { success: `SOW v${sow.version} approved. Skills extraction started in 3.2.`, step: 2 }).then(() => goStep(2))}>Approve</GateButton>}
         </div>
       </>}>
       <div className="banners">
@@ -154,6 +156,7 @@ function SowEditor({ sow, editable, info }: { sow: Sow; editable: boolean; info:
         {showDiff && cmp.kind === 'diff' && <DiffLegend from={cmp.from} to={cmp.to} counts={diff.counts} />}
       </div>
       <div className={`sow-doc ${editable ? 'editable' : 'readonly'} ${showDiff ? 'tracking' : ''}`}><EditorContent editor={editor} aria-label="SOW document" /></div>
+      <VisualsPanel />
     </Pane>
   )
 }
@@ -166,113 +169,32 @@ export function Center({ snap, info }: StepProps) {
   const failed = snap.sowGeneration.find(s => s.status === 'failed')
   const running = snap.sowGeneration.some(s => s.status === 'running' || s.status === 'queued')
   return (
-    <Pane id="center-title" kicker="3.1 · Human review" title="SOW draft" className="center">
+    <Pane id="center-title" kicker="SOW review and FDE approval" title="Scope" className="center">
       {failed ? <ErrorState title={`${failed.label} failed`} action={info.editable &&
           <button className="btn btn-primary" disabled={!!busy} onClick={() => run('Retry SOW generation', () => api.startSowGeneration(ragPipeline.getState().runId), { step: 1 })}><Icon name="refresh" />Retry SOW generation</button>}>
           {failed.error}
         </ErrorState>
         : running ? <><Banner tone="info" icon="spinner">Generating the SOW from the RAG context. It appears here when generation finishes; you can keep working meanwhile.</Banner><Skeleton rows={9} label="Generating SOW" /></>
-        : !snap.uploads.length ? <Empty icon="upload" title="No SOW yet" action={<button className="btn btn-primary" onClick={() => goScreen('1.1')}><Icon name="upload" />Go to 1.1 Intake console</button>}>
-            Upload documents in stage 1. The RAG pipeline (stage 2) builds the context, and the SOW is generated from it here.
+        : !snap.uploads.length ? <Empty icon="upload" title="No SOW yet" action={<button className="btn btn-primary" onClick={() => goScreen('1.1')}><Icon name="upload" />Go to Upload</button>}>
+            Upload documents in Ingestion. The RAG pipeline builds the context, and the SOW is generated from it here.
           </Empty>
-        : <Empty icon="clock" title="Waiting for the RAG context" action={<button className="btn btn-secondary" onClick={() => goScreen('2.1')}>Open 2.1 Context graph</button>}>
-            {ragRunning ? 'The RAG pipeline is running. The SOW is generated when it finishes.' : 'Run the RAG pipeline in stage 2; the SOW is generated from its context.'}
+        : <Empty icon="clock" title="Ready for SOW synthesis" action={
+            <div className="row" style={{ gap: '8px' }}>
+              <button className="btn btn-primary" disabled={!!busy} onClick={() => run('Generate SOW', () => api.startSowGeneration(ragPipeline.getState().runId), { step: 1 })}>
+                <Icon name="bolt" />Generate SOW with Certified Context
+              </button>
+              <button className="btn btn-secondary" onClick={() => goScreen('2.3')}>
+                Verify in Context quality
+              </button>
+            </div>
+          }>
+            {ragRunning ? 'The RAG pipeline is running. Click Generate SOW once verified.' : 'Context graph and pre-flight checks are certified. Synthesize the SOW draft from the discovery context.'}
           </Empty>}
     </Pane>
   )
 }
 
-/** Accuracy of the current SOW version: overall score, rule checks, judge rubric and the findings behind them. */
-function SowAccuracy({ sow }: { sow: Sow }) {
-  const ev = sow.evaluation
-  if (!ev) return null
-  const stale = ev.version !== sow.version
-  const tone = (n: number) => (n >= 85 ? 'ok' : n >= 65 ? 'warn' : 'err')
-  const avg = (m: 'rule' | 'judge') => { const xs = ev.metrics.filter(x => x.method === m); return xs.length ? Math.round(xs.reduce((n, x) => n + x.score, 0) / xs.length) : 0 }
-  return (
-    <Section title="SOW accuracy" aside={ev.simulated ? <DemoTag /> : undefined}>
-      {ev.status === 'running' || stale
-        ? <p className="muted sm acc-running"><Icon name="spinner" size={12} spin /> Evaluating v{sow.version}: rule checks, then {ev.judge} (about a minute on CPU)…</p>
-        : <div className="acc">
-          <div className="acc-head">
-            <span className={`acc-ring tone-${tone(ev.overall!)}`} style={{ '--p': ev.overall } as React.CSSProperties} role="img" aria-label={`Accuracy ${ev.overall} out of 100`}>
-              <span className="acc-score">{ev.overall}</span>
-            </span>
-            <div className="acc-meta">
-              <strong>v{ev.version} accuracy</strong>
-              <span className="muted xs">Rule checks {avg('rule')} · Judge {avg('judge')}</span>
-              <span className="faint xs">{ev.judge}{ev.judgeNote ? ` · ${ev.judgeNote}` : ''}</span>
-            </div>
-          </div>
-          <ul className="acc-metrics">
-            {ev.metrics.map(m => (
-              <li key={m.key} title={m.detail}>
-                <span className="acc-label">{m.label}<span className={`acc-method ${m.method}`}>{m.method === 'rule' ? 'Rule' : 'Judge'}</span></span>
-                <span className={`acc-bar tone-${tone(m.score)}`}><span style={{ width: `${m.score}%` }} /></span>
-                <span className="acc-n">{m.score}</span>
-              </li>
-            ))}
-          </ul>
-          {ev.findings.length > 0
-            ? <details className="acc-findings"><summary>{ev.findings.length} finding{ev.findings.length === 1 ? '' : 's'} to fix</summary>
-              <ul>{ev.findings.slice(0, 20).map((f, i) => (
-                <li key={i}><button className="link xs" onClick={() => setUi({ passage: f.passageId })}>Req {f.requirement}{f.field ? ` · ${f.field}` : ''}</button> <span className="xs">{f.text}</span></li>
-              ))}</ul></details>
-            : <p className="muted xs"><Icon name="check" size={11} /> No rule findings for v{ev.version}.</p>}
-        </div>}
-    </Section>
-  )
-}
 
-export function Right({ snap }: StepProps) {
-  const sow = snap.sow
-  return (
-    <Pane id="right-title" kicker="Evidence and status" title="SOW generation">
-      {snap.sowGeneration.length === 0
-        ? <Empty icon="clock" title="No SOW generation yet">Runs when the RAG pipeline (stage 2) finishes. Each stage reports its status, time and run ID here.</Empty>
-        : <StageList stages={snap.sowGeneration} />}
-      {sow && <SowAccuracy sow={sow} />}
-      <Section title="SOW versions">
-        {!sow ? <p className="muted sm">Produced by the SOW generation stage.</p> : (
-          <dl className="kv">
-            <div><dt>Generated by model</dt><dd className="mono">v{sow.generatedVersion}</dd></div>
-            <div><dt>Current</dt><dd className="mono">v{sow.version}</dd></div>
-            <div><dt>Approval</dt><dd>{sow.approval ? `v${sow.approval.version} · ${fmtTime(sow.approval.at)}` : 'Not approved'}</dd></div>
-            {sow.changeRequest && <div><dt>Last AI regeneration</dt><dd>from v{sow.changeRequest.version} · {fmtTime(sow.changeRequest.at)}</dd></div>}
-          </dl>
-        )}
-      </Section>
-    </Pane>
-  )
-}
 
-/** 3.1 left pane: read-only context. Documents are added only in 1.1. */
-export function Sources({ snap }: StepProps) {
-  const runId = useRag(s => s.runId)
-  const synced = useRag(s => s.lastSyncAt)
-  return (
-    <Pane id="left-title" kicker="Context and scope" title="Sources">
-      <Section title="Source references" aside={<span className="muted sm">{snap.uploads.filter(isReleased).length}</span>}>
-        {!snap.uploads.some(isReleased) ? <p className="muted sm">No verified documents yet.</p> : (
-          <ul className="files">
-            {snap.uploads.filter(isReleased).map(u => (
-              <li key={u.id} className="file"><Icon name="file" />
-                <div className="file-main"><span className="file-name">{u.name}</span><Copy value={u.objectKey} label="object key" /></div>
-              </li>
-            ))}
-          </ul>
-        )}
-        <button className="link sm" onClick={() => goScreen('1.1')}><Icon name="upload" size={12} />Add documents in 1.1 Intake console</button>
-      </Section>
-      <Section title="RAG context">
-        <dl className="kv">
-          <div><dt>Context run</dt><dd className="mono xs">{runId ?? 'not run'}</dd></div>
-          <div><dt>Cognee synced</dt><dd>{synced ? fmtTime(synced) : 'not yet'}</dd></div>
-        </dl>
-        <button className="link sm" onClick={() => goScreen('2.1')}><Icon name="link" size={12} />Open 2.1 Context graph</button>
-      </Section>
-    </Pane>
-  )
-}
 
 export { Intake } from './Intake'

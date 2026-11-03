@@ -1,6 +1,7 @@
-// BAM progress tracker and the app's single screen registry: 4 stages x 4 screens (the 4x4 UX document).
-// IDs are stable keys for persistence and routing. 4.1–4.4 are screen NAVIGATION order, not execution order:
-// never derive a "next step" gate from these numbers.
+// BAM progress tracker and the app's single screen registry: 4 workflow stages, each with its steps in navigation
+// order. IDs are stable keys for persistence and routing, NOT display text and NOT order: screens were renamed and
+// moved (Template and Translate keep IDs 4.2 and 4.3 inside Workbench; Sandbox is 4.8).
+// The UI never shows the IDs. Never derive a "next step" gate from them.
 import type { StepId } from '../api/types'
 
 export const TRACKER_STATUSES = ['not_started', 'in_progress', 'needs_review', 'done', 'blocked'] as const
@@ -21,56 +22,110 @@ export interface TrackerItem {
   label: string
   shortLabel: string
   description: string
+  /** Outline icon name (components/ui.tsx). */
+  icon: string
   /** Screen URL (screens only). */
   path?: string
   /** The backend workbench step that gates (locks) this screen, if any. */
   step?: StepId
+  /** Opened from another screen, not listed in the navigation (`navAs` is highlighted instead). Never counted. */
+  hidden?: boolean
+  navAs?: string
+  /** Listed, but optional work: never counted toward its stage. */
+  optional?: boolean
+  /** Internal diagnostics (scan, quarantine): hidden from the FDE everywhere; the route redirects to Upload. */
+  internal?: boolean
+  /** Execution mode: a human checkpoint (HITL) or a step that runs on its own (Automated, tagged in the rail and header). */
+  mode?: 'hitl' | 'automated'
 }
 
-const stage = (id: string, label: string, description: string): TrackerItem =>
-  ({ id, parentId: null, label, shortLabel: label, description })
-const screen = (id: string, label: string, path: string, description: string, step?: StepId): TrackerItem =>
-  ({ id, parentId: id.split('.')[0], label, shortLabel: label, description, path, step })
+const stage = (id: string, label: string, icon: string, description: string): TrackerItem =>
+  ({ id, parentId: null, label, shortLabel: label, icon, description })
+const screen = (id: string, parentId: string, label: string, icon: string, path: string, description: string, extra: Partial<TrackerItem> = {}): TrackerItem =>
+  ({ id, parentId, label, shortLabel: label, icon, description, path, ...extra })
 
-// Excluded on purpose: Jinja2 render (part of 4.1 activity C), Masters, Admin, Client SRI, connectors.
+// Final workflow (15 Oct 2026, BuLLM confirmed workflow): Ingestion Upload · Standardize · Parse · Review, Context Sync ·
+// Index · Schema · Verify, Workbench Scope · Grid · Template · Translate, Validation Sandbox · Check · Certify · Commit.
+// Earlier screens keep their IDs and routes: they are renamed, moved, or kept as hidden details of a final step.
+// `internal` screens (virus scan, quarantine, file detail) are diagnostics with no FDE role: never listed, searched
+// or opened by the FDE (their old URLs redirect to Upload); the scan and quarantine still enforce every gate.
+// Admin and Usage & improvement are global destinations (GLOBAL_ROUTES), not workflow screens.
 export const TRACKER_ITEMS: readonly TrackerItem[] = [
-  stage('1', 'Data Ingestion', 'Upload the discovery documents for this RFQ and check what was accepted.'),
-  screen('1.1', 'Intake console: upload & virus scan', '/ingestion', 'Upload documents. Only virus-scanned, verified files enter RAG, via Start ingestion run.', 1),
-  screen('1.2', 'Ingestion queue/jobs', '/ingestion/queue', 'Every file with its processing stage, progress, errors and retry.'),
-  screen('1.3', 'File detail/preview', '/ingestion/file', 'One source file: metadata, parsed preview and flags.'),
-  screen('1.4', 'Ingestion review', '/ingestion/review', 'Accepted and rejected items with reasons, and readiness for the RAG hand-off.'),
+  stage('1', 'Ingestion', 'tb-inbox', 'Add the source documents, standardize and parse them, then confirm what goes to Context.'),
+  screen('1.1', '1', 'Upload', 'tb-upload', '/ingestion/upload', 'Choose source files and track upload readiness.', { step: 1 }),
+  screen('1.8', '1', 'Standardize', 'tb-transform', '/ingestion/standardize', 'Classify each file, keep the original, flag problems and decide: ready, local AI fix or manual review.', { mode: 'automated' }),
+  screen('1.9', '1', 'Parse', 'tb-file-code', '/ingestion/parse', 'Extract text, tables and structure from the ready files.', { mode: 'automated' }),
+  screen('1.4', '1', 'Review', 'tb-clipboard-check', '/ingestion/review', 'Confirm the accepted, parsed files that go to Context. Not SOW approval.'),
+  screen('1.6', '1', 'Connectors', 'plug', '/ingestion/connectors', 'Optional. Pull documents from a connected source.', { hidden: true, navAs: '1.4', optional: true }),
+  screen('1.5', '1', 'Scan', 'scan', '/ingestion/scan', 'Internal diagnostics: per-file virus scan.', { step: 1, hidden: true, internal: true, navAs: '1.1' }),
+  screen('1.7', '1', 'Quarantine', 'shield', '/ingestion/quarantine', 'Internal diagnostics: files held by the scan.', { hidden: true, internal: true, navAs: '1.1' }),
+  screen('1.3', '1', 'File detail', 'file', '/ingestion/file', 'Internal diagnostics: one stored file.', { hidden: true, internal: true, navAs: '1.1' }),
 
-  stage('2', 'RAG', 'Build the context graph and draft schemas from the ingested objects.'),
-  screen('2.1', 'Context graph explorer', '/rag/graph', 'Graph nodes link back to their source objects (Cognee + OKF).'),
+  stage('2', 'Context', 'tb-git-branch', 'Sync Admin Masters, index the context graph, review the schema and verify answers.'),
+  screen('2.5', '2', 'Sync', 'tb-refresh', '/context/sync', 'Sync Admin Masters for context extraction.', { mode: 'hitl' }),
+  screen('2.1', '2', 'Index', 'tb-search', '/rag/graph', 'Graph nodes · current graph explorer.', { mode: 'automated' }),
+  screen('2.2', '2', 'Schema', 'tb-schema', '/rag/schemas', 'Schema drafts from the context graph.', { mode: 'automated' }),
+  screen('2.3', '2', 'Verify', 'tb-shield-check', '/rag/quality', 'Context testing · Questions only.', { mode: 'hitl' }),
+  screen('2.4', '2', 'Context readiness', 'doccheck', '/rag/review', 'Graph, schema and retrieval readiness, the knowledge bundle and provenance.', { hidden: true, navAs: '2.3' }),
 
-  stage('3', 'FDE Workbench', 'Generate and approve the SOW, then turn it into ISATVON skills and a manifest.'),
-  screen('3.1', 'SOW generation and approval', '/workbench/sow', 'SOW draft with version comparison; approval is tied to the reviewed version.', 1),
-  screen('3.2', 'ISATVON skills grid', '/workbench/skills', 'Agent > Skill grid with all seven ISATVON fields, row diffs and the certification summary.', 2),
-  screen('3.3', 'Skills/code review', '/workbench/review', 'One skill at a time: its contract, generated code diff and review findings (read-only).'),
-  screen('3.4', 'Manifest and deploy prep', '/workbench/release', 'Manifest version, release prerequisites, version history and the hand-off into the Sandbox.'),
+  stage('3', 'Workbench', 'tb-briefcase', 'Approve the scope, review the skills grid, then the manifest and the translated code.'),
+  screen('3.1', '3', 'Scope', 'tb-target', '/workbench/sow', 'SOW review and FDE approval.', { step: 1 }),
+  screen('3.2', '3', 'Grid', 'tb-table', '/workbench/skills', 'Agent > Skill review with all seven ISATVON fields.', { step: 2 }),
+  screen('4.2', '3', 'Template', 'tb-template', '/workbench/manifest', 'manifest.json, linked to the approved Scope and Grid.', { step: 3 }),
+  screen('4.3', '3', 'Translate', 'tb-code', '/workbench/code', 'Translation: the translated skill code and its translation check.', { step: 3 }),
+  screen('3.3', '3', 'Skill review', 'eye', '/workbench/review', 'One skill at a time: its contract, generated code diff and review findings (read-only).', { hidden: true, navAs: '3.2' }),
+  screen('3.4', '3', 'Release prep', 'checklist', '/workbench/release', 'Manifest version, release prerequisites and version history.', { hidden: true, navAs: '4.3' }),
 
-  stage('4', 'Sandbox', 'Validate and edit the generated code and manifest, test them, freeze and deploy to Staging.'),
-  screen('4.1', 'Activities', '/sandbox/validation', 'Temporal activities A–D with attempt history and findings.', 3),
-  screen('4.2', 'Manifest JSON', '/sandbox/manifest', 'Edit the manifest against the certified or generated baseline, then approve manifest and code.', 3),
-  screen('4.3', 'Generated code', '/sandbox/code', 'Edit the generated skill code against the generated version; saving re-runs the AST check.', 3),
-  screen('4.4', 'Sandbox and assertions', '/sandbox/results', 'Certification checklist and assertion evidence, then Test > Review > Commit > Deploy.', 4),
+  stage('4', 'Validation', 'tb-shield-check', 'Run the isolated sandbox, check the results, certify the checked artifact and commit it to BAM_db.'),
+  screen('4.8', '4', 'Sandbox', 'tb-box', '/validation/sandbox', 'Create and run the isolated validation environment.', { step: 4 }),
+  screen('4.4', '4', 'Check', 'tb-list-check', '/sandbox/results', 'Validation results and evidence for the current artifact.', { step: 4 }),
+  screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Record approval of the checked artifact. Commit comes next.', { step: 4 }),
+  screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Save the certified artifact to BAM_db, then deploy it to Staging.', { step: 4 }),
+  screen('4.1', '4', 'Validation activities', 'circle-check', '/workbench/validation', 'Check activities A–D with attempt history and findings.', { step: 3, hidden: true, navAs: '4.4' }),
+  screen('4.7', '4', 'Staging complete', 'rocket', '/sandbox/staging', 'What is live on Staging. Staging complete never means production.', { step: 4, hidden: true, navAs: '4.6' }),
 ]
+
+/** Global destinations outside the four stages: Usage (top-bar gauge) and Admin (profile menu). */
+export const GLOBAL_ROUTES = {
+  usage: { path: '/usage', section: null, label: 'Usage & improvement' },
+  admin: { path: '/admin/masters', section: 'Admin', label: 'Masters' },
+} as const
+export type GlobalRoute = keyof typeof GLOBAL_ROUTES
+export const globalByPath = (path: string) => (Object.keys(GLOBAL_ROUTES) as GlobalRoute[]).find(k => GLOBAL_ROUTES[k].path === path)
+
+/** Old paths keep working (bookmarks). Scan and Quarantine are internal, so their URLs open Upload. */
+export const ROUTE_ALIASES: Readonly<Record<string, string>> = {
+  '/ingestion': '/ingestion/upload',
+  '/ingestion/queue': '/ingestion/upload',
+  '/ingestion/checklist': '/ingestion/review',
+  '/context': '/context/sync',
+  '/validation': '/validation/sandbox',
+  '/sandbox/validation': '/workbench/validation',
+  '/sandbox/manifest': '/workbench/manifest',
+  '/sandbox/code': '/workbench/code',
+}
 
 export const TASKS = TRACKER_ITEMS.filter(i => i.parentId === null)
 export const SUBTASKS = TRACKER_ITEMS.filter(i => i.parentId !== null)
-export const subtasksOf = (stageId: string) => SUBTASKS.filter(s => s.parentId === stageId)
+/** A stage's screens as listed in the navigation (hidden screens excluded). */
+export const subtasksOf = (stageId: string) => SUBTASKS.filter(s => s.parentId === stageId && !s.hidden)
+/** The screens that count toward a stage's progress (no hidden or optional ones). */
+export const countedOf = (stageId: string) => subtasksOf(stageId).filter(s => !s.optional)
 
 /** Every screen's URL and, for gated screens, the backend step that locks it. Derived from TRACKER_ITEMS. */
 export interface ScreenRoute { path: string; step?: StepId }
 export const SCREEN_ROUTES: Readonly<Record<string, ScreenRoute>> =
   Object.fromEntries(SUBTASKS.map(s => [s.id, { path: s.path!, ...(s.step ? { step: s.step } : {}) }]))
 /** The screen where each backend workbench step is worked on. */
-export const STEP_SCREEN: Readonly<Record<StepId, string>> = { 1: '3.1', 2: '3.2', 3: '4.1', 4: '4.4' }
+export const STEP_SCREEN: Readonly<Record<StepId, string>> = { 1: '3.1', 2: '3.2', 3: '4.2', 4: '4.8' }
 export const screenByPath = (path: string) => {
   const item = SUBTASKS.find(s => s.path === path)
   return item ? { id: item.id, path: item.path!, step: item.step, item } : undefined
 }
-export const screenLabel = (id: string) => `${id} ${TRACKER_ITEMS.find(i => i.id === id)?.label ?? ''}`.trim()
+/** The user-facing name of a screen (never its ID). */
+export const screenLabel = (id: string) => TRACKER_ITEMS.find(i => i.id === id)?.label ?? id
+/** The stage a screen belongs to. */
+export const stageOf = (id: string) => TASKS.find(t => t.id === SUBTASKS.find(s => s.id === id)?.parentId)
 
 export type Statuses = Record<string, TrackerStatus>
 export const initialStatuses = (): Statuses => Object.fromEntries(SUBTASKS.map(s => [s.id, 'not_started']))
@@ -92,5 +147,5 @@ export function effectiveStatuses(evidence: Statuses, manual: Statuses, basis: P
   return Object.fromEntries(SUBTASKS.map(s => [s.id, basis[s.id] !== undefined && basis[s.id] === evidence[s.id] ? manual[s.id] : evidence[s.id] ?? 'not_started']))
 }
 
-export const taskStatus = (stageId: string, statuses: Statuses) => rollup(subtasksOf(stageId).map(s => statuses[s.id] ?? 'not_started'))
+export const taskStatus = (stageId: string, statuses: Statuses) => rollup(countedOf(stageId).map(s => statuses[s.id] ?? 'not_started'))
 export const doneCount = (items: readonly TrackerItem[], statuses: Statuses) => items.filter(s => statuses[s.id] === 'done').length

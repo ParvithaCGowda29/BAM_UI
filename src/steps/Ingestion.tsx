@@ -1,103 +1,27 @@
-// Stage 1 screens 1.2 Ingestion queue/jobs, 1.3 File detail/preview and 1.4 Ingestion review.
-// Built from the real service model only: uploads in the shared Uppy instance (pending/uploading/failed),
-// stored upload records with their virus-scan state (mock scan adapter), and files refused at intake.
-// Parsing has no backend contract in this build, so it is shown as unavailable, never as working.
-import { useState } from 'react'
-import { useUppyState } from '@uppy/react'
-import { ACCEPTED_TYPES, type Snapshot } from '../api/types'
-import { setUi, uppy, useUi } from '../lib/store'
+// Ingestion screens besides Upload and Standardize: Parse, Review and the pinned footers, plus Connectors (opened from
+// Review) and the internal diagnostics File detail and Quarantine (no FDE route). Built from the real service model
+// only: stored upload records, the RAG run's extraction steps, and files refused at intake. Per-file parsing has no
+// backend contract in this build, so Parse shows the run's extraction state, never invented per-file results.
+import { useEffect, useRef, useState } from 'react'
+import type { Snapshot } from '../api/types'
+import { setUi, useUi } from '../lib/store'
 import { goScreen } from '../lib/route'
-import { useRag } from '../rag/ragPipeline.ts'
 import { JOBS } from '../rag/mockData.ts'
-import { DemoTag } from '../components/release'
-import { Banner, Copy, Empty, Icon, StatusPill, Time, fmtBytes } from '../components/ui'
-import { isReleased } from '../api/scanGate.ts'
+import { useAction } from '../lib/data'
+import { api } from '../api/adapter'
+import { Copy, Empty, GateButton, Icon, Kpis, StatusPill, Time, Tip, fmtBytes } from '../components/ui'
+import { tips } from '../lib/actionTips'
+import { FileRows, ScreenTitle, SecurityDetails, fdeView, useAdvanceWhen } from './IngestionFlow'
+import { Foot, needsReview, useReviewFiles, useStandardize } from './Standardize'
+import { STATE_TEXT } from '../api/standardize.ts'
+import { UploadProgress, isAdded, uploadCount, useUploadRows } from './UploadPanes'
+import { ragPipeline, useRag } from '../rag/ragPipeline.ts'
+import StatusMark from '../components/reactbits/StatusMark'
+import { ReviewWaiting } from './ReviewWaiting'
+import { isReleased, scanView } from '../api/scanGate.ts'
+import { canAddFiles, useGoal } from '../lib/goal.ts'
 
-type QState = 'pending' | 'processing' | 'complete' | 'failed' | 'quarantined'
-interface QRow { key: string; name: string; size?: number; state: QState; stage: string; pct?: number; detail?: string; at?: string; uppyId?: string; uploadId?: string }
-const Q_LABEL: Record<QState, string> = { pending: 'Pending', processing: 'Processing', complete: 'Complete', failed: 'Failed', quarantined: 'Quarantined' }
-const Q_PILL: Record<QState, 'queued' | 'running' | 'pass' | 'fail' | 'unavailable'> = { pending: 'queued', processing: 'running', complete: 'pass', failed: 'fail', quarantined: 'unavailable' }
-
-function useQueue(snap: Snapshot): QRow[] {
-  const files = useUppyState(uppy, s => s.files)
-  const rejected = useUi(s => s.rejected)
-  const inFlight = Object.values(files).filter(f => !f.progress.uploadComplete).map((f): QRow => ({
-    key: `u:${f.id}`, name: f.name ?? 'file', size: f.size ?? undefined, uppyId: f.id,
-    state: f.error ? 'failed' : f.progress.uploadStarted ? 'processing' : 'pending',
-    stage: f.error ? 'Upload failed' : f.progress.uploadStarted ? 'Uploading to object storage' : 'Added, not started',
-    pct: f.progress.percentage ?? 0, detail: f.error ?? undefined,
-  }))
-  const stored = snap.uploads.map((u): QRow => ({
-    key: `s:${u.id}`, name: u.name, size: u.size, uploadId: u.id, at: u.uploadedAt,
-    state: u.status !== 'stored' || u.scanError ? 'failed' : u.scan === 'blocked' ? 'quarantined' : u.scan === 'scanning' ? 'processing' : 'complete',
-    stage: u.status !== 'stored' ? 'Storage failed' : u.scanError ? 'Virus scan error' : u.scan === 'blocked' ? 'Threat detected · quarantined' : u.scan === 'scanning' ? 'Virus scan running' : 'Verified · released',
-    pct: u.scan === 'scanning' && !u.scanError ? undefined : 100, detail: u.error ?? u.scanError ?? u.threat ?? u.objectKey,
-  }))
-  const refused = rejected.map((r, i): QRow => ({ key: `r:${i}`, name: r.name, state: 'failed', stage: 'Refused at intake', detail: r.reason, at: r.at }))
-  return [...inFlight, ...stored, ...refused]
-}
-
-function Provenance({ snap }: { snap: Snapshot }) {
-  const runId = useRag(s => s.runId)
-  return (
-    <Banner tone="info" icon="question">
-      <strong>Dataset provenance.</strong> {snap.uploads.length && runId
-        ? `${snap.uploads.length} uploaded file${snap.uploads.length === 1 ? '' : 's'} started RAG run ${runId}.`
-        : 'No stored upload has started a RAG run yet.'}{' '}
-      This build has no parser, so the graph uses the labelled EXAMPLE fixture dataset (RFQ-2026-0147, {JOBS.length} objects), not the contents of your files.
-      Files whose names match a fixture object are linked to it; nothing else is linked. Real lineage needs the Cognee/OKF API.
-    </Banner>
-  )
-}
-
-// ---- 1.2 Ingestion queue/jobs ---------------------------------------------------------------------
-export function IngestionQueue({ snap }: { snap: Snapshot }) {
-  const rows = useQueue(snap)
-  const [filter, setFilter] = useState<QState | 'all'>('all')
-  const count = (s: QState) => rows.filter(r => r.state === s).length
-  const shown = filter === 'all' ? rows : rows.filter(r => r.state === filter)
-  return (
-    <div className="rag">
-      <div className="rag-col">
-        <section className="rag-card" aria-labelledby="q-title">
-          <header className="rag-card-head"><h3 id="q-title">Ingestion queue</h3><span className="muted xs">per file · object storage s3://bam-intake/</span>
-            <span className="tag">{rows.length} item{rows.length === 1 ? '' : 's'}</span></header>
-          <div className="filter-chips" role="group" aria-label="Filter by state">
-            <button className="class-chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All {rows.length}</button>
-            {(Object.keys(Q_LABEL) as QState[]).map(s => (
-              <button key={s} className="class-chip" aria-pressed={filter === s} onClick={() => setFilter(s)}>{Q_LABEL[s]} {count(s)}</button>
-            ))}
-          </div>
-          {shown.length === 0 ? <Empty icon="upload" title={rows.length ? `No ${Q_LABEL[filter as QState].toLowerCase()} items` : 'Nothing ingested yet'}
-                action={!rows.length && <button className="btn btn-primary" onClick={() => goScreen('1.1')}><Icon name="upload" />Upload in 1.1</button>}>
-                {rows.length ? 'Choose another filter.' : 'Uploads from 1.1 appear here with their processing stage, progress and errors.'}</Empty>
-            : <div className="scroll-box">
-              <table className="table queue">
-                <thead><tr><th scope="col">File</th><th scope="col">State</th><th scope="col">Stage</th><th scope="col">Progress</th><th scope="col">Detail</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-                <tbody>{shown.map(r => (
-                  <tr key={r.key} className={r.state === 'failed' ? 'row-fail' : ''}>
-                    <th scope="row"><span className="file-name">{r.name}</span>{r.size !== undefined && <div className="muted xs">{fmtBytes(r.size)}</div>}</th>
-                    <td><StatusPill status={Q_PILL[r.state]} text={Q_LABEL[r.state]} /></td>
-                    <td className="sm">{r.stage}{r.at && <div className="muted xs"><Time iso={r.at} /></div>}</td>
-                    <td>{r.pct !== undefined && r.state !== 'failed' ? <span className="progress" role="progressbar" aria-valuenow={r.pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${r.name} progress`}><span style={{ width: `${r.pct}%` }} /></span> : '—'}</td>
-                    <td className="xs">{r.detail && (r.detail.startsWith('s3://') ? <Copy value={r.detail} label="object key" /> : <span className={r.state === 'failed' ? 'stage-error' : ''}>{r.detail}</span>)}</td>
-                    <td className="row">
-                      {r.uppyId && r.state === 'failed' && <button className="btn btn-secondary sm" onClick={() => void uppy.retryUpload(r.uppyId!)}><Icon name="refresh" />Retry</button>}
-                      {r.uploadId && <button className="btn btn-ghost sm" onClick={() => { setUi({ fileDetail: r.uploadId }); goScreen('1.3') }}>Detail</button>}
-                    </td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>}
-          <footer className="rag-card-foot"><span>Stages: added → uploading → quarantine → virus scan → verified (released) or blocked. Start ingestion run in 1.1 hands verified files to RAG. Parsing and classification run in stage 2.</span><span>Retry re-sends a failed upload</span></footer>
-        </section>
-        <Provenance snap={snap} />
-      </div>
-    </div>
-  )
-}
-
-// ---- 1.3 File detail/preview ------------------------------------------------------------------------
+// ---- File detail/preview (opened from Scan) ------------------------------------------------------------------------
 export function FileDetail({ snap }: { snap: Snapshot }) {
   const picked = useUi(s => s.fileDetail)
   const file = snap.uploads.find(u => u.id === picked) ?? snap.uploads[0]
@@ -108,13 +32,13 @@ export function FileDetail({ snap }: { snap: Snapshot }) {
       <div className="rag-grid g13">
         <section className="rag-card" aria-labelledby="fl-title">
           <header className="rag-card-head"><h3 id="fl-title">Stored files</h3><span className="tag">{snap.uploads.length}</span></header>
-          {snap.uploads.length === 0 ? <Empty icon="upload" title="No files yet" action={<button className="btn btn-primary" onClick={() => goScreen('1.1')}><Icon name="upload" />Upload in 1.1</button>}>Stored files appear here.</Empty>
+          {snap.uploads.length === 0 ? <Empty icon="upload" title="No files yet" action={<button className="btn btn-primary" onClick={() => goScreen('1.1')}><Icon name="upload" />Upload documents</button>}>Stored files appear here.</Empty>
             : <ul className="nav-list">{snap.uploads.map(u => (
                 <li key={u.id}><button className="nav-item" aria-current={file?.id === u.id || undefined} onClick={() => setUi({ fileDetail: u.id })}>
                   <span className="file-name">{u.name}</span><span className="muted xs">{fmtBytes(u.size)}</span></button></li>))}</ul>}
         </section>
         <div className="rag-col">
-          {!file ? <section className="rag-card"><Empty icon="file" title="Select a file">Upload documents in 1.1, then pick one to see its metadata and preview.</Empty></section> : <>
+          {!file ? <section className="rag-card"><Empty icon="file" title="Select a file">Upload documents, then pick one to see its metadata and preview.</Empty></section> : <>
             <section className="rag-card" aria-labelledby="fd-title">
               <header className="rag-card-head"><h3 id="fd-title" className="file-name">{file.name}</h3><StatusPill status={file.status === 'stored' ? 'pass' : 'fail'} text={file.status === 'stored' ? 'Stored' : 'Failed'} /></header>
               <dl className="kv two-col">
@@ -128,7 +52,7 @@ export function FileDetail({ snap }: { snap: Snapshot }) {
             </section>
             <section className="rag-card" aria-labelledby="pp-title">
               <header className="rag-card-head"><h3 id="pp-title">Parsed preview and flags</h3><StatusPill status="unavailable" text="Not available" /></header>
-              <p className="muted sm">No parse service is connected in this build, so this file's rows, text and flags cannot be shown. Nothing here is inferred or made up.</p>
+              <p className="muted sm">This file's rows, text and flags can't be shown yet. Nothing here is inferred or made up.</p>
               {fixture ? (
                 <div className="lineage">
                   <p className="sm"><strong>Fixture lineage</strong> <span className="tag example-tag">EXAMPLE fixture</span></p>
@@ -138,6 +62,7 @@ export function FileDetail({ snap }: { snap: Snapshot }) {
                     <div><dt>Entities</dt><dd>{fixture.entities}</dd></div><div><dt>Confidence</dt><dd>{fixture.confidence?.toFixed(2) ?? '—'}</dd></div>
                     <div><dt>Fixture object</dt><dd><Copy value={fixture.s3} label="fixture URI" /></dd></div>
                   </dl>
+                  <button className="link sm" onClick={() => goScreen('2.3')}><Icon name="link" size={12} />See it in Context quality extraction jobs</button>
                 </div>
               ) : <p className="muted xs">No fixture object matches this file name, so it has no lineage into the example graph.</p>}
             </section>
@@ -148,54 +73,209 @@ export function FileDetail({ snap }: { snap: Snapshot }) {
   )
 }
 
-// ---- 1.4 Ingestion review ---------------------------------------------------------------------------
+// ---- Parse ---------------------------------------------------------------------------------------------------
+/** Extraction of the current run (the existing pipeline steps: chunk + embed, entity extraction). Per-file parsing has
+ *  no backend contract, so every input file shows the run's extraction state; the fixture jobs are in the details. */
+export function ParseView({ snap }: { snap: Snapshot }) {
+  const rag = useRag(s => s)
+  const files = snap.uploads.filter(u => snap.ingestion?.fileIds.includes(u.id))
+  const step = (k: string) => rag.steps.find(x => x.key === k)
+  const ex = step('extract'), ch = step('chunk')
+  const failed = [ch, ex].find(x => x?.status === 'failed')
+  const state = !snap.ingestion ? 'waiting' : failed ? 'failed' : ex?.status === 'done' ? 'parsed' : 'parsing'
+  const PILLS = { waiting: ['Waiting', ''], parsing: ['Parsing', 'tone-info'], parsed: ['Parsed', 'tone-ok'], failed: ['Failed', 'tone-err'] } as const
+  return (
+    <main className="ing dc" aria-labelledby="center-title">
+      <ScreenTitle title="Extract text & structure" help="Uses the original, or its approved analysis copy from Standardize." />
+      <Kpis label="Parse summary" items={[
+        { value: files.length, label: 'Ready files' },
+        { value: state === 'parsed' ? files.length : 0, label: 'Parsed', tone: state === 'parsed' ? 'ok' : undefined },
+        { value: state === 'parsing' ? files.length : state === 'failed' ? `${files.length} failed` : 0, label: state === 'failed' ? 'Errors' : 'Parsing', tone: state === 'failed' ? 'err' : undefined },
+      ]} />
+      {!snap.ingestion ? <p className="dc-none"><Icon name="tb-transform" size={16} />Nothing to parse yet. Standardize hands the files on once every file is ready.</p> : (
+        <ul className="dc-list" aria-label="Files">
+          {files.map(u => <li key={u.id}><Icon name="tb-file-code" size={15} /><div><strong className="dc-name">{u.name}</strong>
+            <span className="muted xs">{state === 'parsed' ? 'Text, tables and structure extracted' : state === 'failed' ? failed?.error ?? 'Extraction failed' : 'Extracting text, tables and structure'}</span></div>
+            <span className={`dc-pill ${PILLS[state][1]}`}>{state === 'parsing' && <Icon name="spinner" size={11} spin />}{PILLS[state][0]}</span></li>)}
+        </ul>
+      )}
+      {failed && <div className="rr-warn tone-err" role="alert"><Icon name="alert" size={15} /><div><strong className="sm">{failed.label} failed</strong><span className="xs">{failed.error ?? 'No reason reported'}</span></div>
+        <button className="btn btn-secondary sm" onClick={() => ragPipeline.retry(failed.key)}><Icon name="refresh" />Retry</button></div>}
+      <div className="dc-rows">
+        <details><summary><strong>Extraction details</strong><span className="dc-count">{JOBS.length}</span><Icon name="down" size={13} /></summary>
+          <p className="muted sm">Extracted text and tables stay linked to their source files. The extraction jobs below run on the labelled EXAMPLE dataset; your uploads are not parsed into it yet.</p>
+          <ul className="dc-files">{JOBS.map((j, i) => <li key={j.object}><Icon name="file" size={15} /><span className="dc-name">{j.object}</span><span className="muted xs">{j.okfClass} · {j.extractor}</span><span className="muted xs">{rag.jobs[i] ?? 'queued'}</span></li>)}</ul>
+        </details>
+      </div>
+    </main>
+  )
+}
+
+// ---- Review --------------------------------------------------------------------------------------------------
+/** Confirms the accepted, parsed files that go to Context. Not SOW approval. Only eligible files are listed;
+ *  everything else is one neutral "Excluded" row. */
 export function IngestionReview({ snap }: { snap: Snapshot }) {
   const rejected = useUi(s => s.rejected)
-  const inFlight = useUppyState(uppy, s => Object.values(s.files).filter(f => f.progress.uploadStarted && !f.progress.uploadComplete && !f.error).length)
   const rag = useRag(s => s)
-  const accepted = snap.uploads.filter(isReleased)
-  const ragFailed = rag.steps.find(s => s.status === 'failed')
-  const checks: { label: string; ok: boolean | 'running'; detail: string }[] = [
-    { label: 'At least one verified document', ok: accepted.length > 0, detail: accepted.length ? `${accepted.length} virus-scanned and released` : 'Upload documents in 1.1 and wait for the virus scan' },
-    { label: 'No uploads still running', ok: inFlight === 0 ? true : 'running', detail: inFlight ? `${inFlight} upload(s) in progress` : 'All uploads finished' },
-    { label: 'Handed to RAG (stage 2)', ok: snap.ingestion && rag.runId ? (ragFailed ? false : rag.lastSyncAt ? true : 'running') : false,
-      detail: !snap.ingestion || !rag.runId ? 'Starts with Start ingestion run in 1.1, once every scan passes' : ragFailed ? `Run ${rag.runId} failed at ${ragFailed.label}` : rag.lastSyncAt ? `Run ${rag.runId} synced` : `Run ${rag.runId} in progress` },
-  ]
+  const std = useStandardize(snap)
+  const ingested = snap.uploads.filter(u => snap.ingestion?.fileIds.includes(u.id))
+  const ex = rag.steps.find(x => x.key === 'extract')
+  const parsed = !!snap.ingestion && ex?.status === 'done', parseFailed = ex?.status === 'failed'
+  const excluded = snap.uploads.length - ingested.length
+  // Held for review = the shared rule (useReviewFiles), the same files Upload flags and the chat counts. Any other file
+  // not handed on (e.g. its content was unavailable) is listed separately with its reason, so nothing is left out silently.
+  const { files: held } = useReviewFiles(snap)
+  const notHandedOn = snap.ingestion ? std.filter(f => !snap.ingestion!.fileIds.includes(f.u.id) && !needsReview(f)) : []
+  const parseText = parsed ? 'Complete' : parseFailed ? 'Failed' : snap.ingestion ? 'Parsing' : 'Waiting'
+  // Nothing handed on yet: the whole pane is the waiting state. The hand-off plays it out over the review (~450ms).
+  const waiting = !handedOn(snap)
+  const [morph, setMorph] = useState(false)
+  const wasWaiting = useRef(waiting)
+  useEffect(() => { if (wasWaiting.current && !waiting) setMorph(true); wasWaiting.current = waiting }, [waiting])
+  useEffect(() => { if (!morph) return; const t = setTimeout(() => setMorph(false), 450); return () => clearTimeout(t) }, [morph])
+  if (waiting) return (
+    <main className="ing dc rw-main" aria-labelledby="center-title">
+      <h2 id="center-title" className="sr-only" tabIndex={-1}>Review</h2>
+      <ReviewWaiting />
+    </main>
+  )
   return (
-    <div className="rag">
-      <div className="rag-col">
-        <div className="rag-grid g14">
-          <section className="rag-card" aria-labelledby="acc-title">
-            <header className="rag-card-head"><h3 id="acc-title">Accepted</h3><span className="tag">{accepted.length}</span></header>
-            {accepted.length === 0 ? <p className="muted sm">Nothing accepted yet.</p> : <ul className="files">{accepted.map(u => (
-              <li key={u.id} className="file"><Icon name="check" />
-                <div className="file-main"><button className="link file-name" onClick={() => { setUi({ fileDetail: u.id }); goScreen('1.3') }}>{u.name}</button>
-                  <span className="muted xs">{fmtBytes(u.size)} · uploaded <Time iso={u.uploadedAt} /> · virus scan clean</span></div></li>))}</ul>}
-          </section>
-          <section className="rag-card" aria-labelledby="rej-title">
-            <header className="rag-card-head"><h3 id="rej-title">Rejected and quarantined</h3><span className="tag">{rejected.length + snap.uploads.filter(u => u.scan === 'blocked').length}</span></header>
-            {snap.uploads.filter(u => u.scan === 'blocked').map(u => (
-              <div key={u.id} className="file"><Icon name="alert" /><div className="file-main"><span className="file-name">{u.name}</span><span className="stage-error xs">Threat detected: quarantined</span></div></div>))}
-            {rejected.length === 0 ? <p className="muted sm">No file was refused at upload in this session.</p> : <ul className="files">{rejected.map((r, i) => (
-              <li key={i} className="file"><Icon name="x" /><div className="file-main"><span className="file-name">{r.name}</span><span className="stage-error xs">{r.reason}</span><span className="muted xs"><Time iso={r.at} /></span></div></li>))}</ul>}
-            <p className="muted xs" id="accepted-types"><Icon name="file" size={11} /> Accepted intake types: {ACCEPTED_TYPES.join(', ')}. Anything else is filtered out at upload, and an object whose type has no extraction rule stays Unclassified in RAG.</p>
-            <p className="muted xs"><Icon name="lock" size={11} /> BuLL*Sav verdicts come from the mock scan adapter in this build; the real Digibull Security AntiVirus Engine service (ClamAV core, clamd) replaces it behind the same API.</p>
-          </section>
-        </div>
-        <section className="rag-card" aria-labelledby="ready-title">
-          <header className="rag-card-head"><h3 id="ready-title">Hand-off readiness</h3><DemoTag /></header>
-          <ol className="cert-list">{checks.map(c => (
-            <li key={c.label} className="cert-item">
-              <StatusPill status={c.ok === true ? 'pass' : c.ok === 'running' ? 'running' : 'pending'} text={c.ok === true ? 'Ready' : c.ok === 'running' ? 'In progress' : 'Not yet'} />
-              <div className="cert-main"><span className="cert-label">{c.label}</span><span className="cert-detail">{c.detail}</span></div>
-            </li>))}</ol>
-          <div className="row">
-            <button className="btn btn-secondary" onClick={() => goScreen('1.2')}>Open 1.2 queue</button>
-            <button className="btn btn-primary" onClick={() => goScreen('2.1')}>Continue to 2.1 Context graph</button>
-          </div>
-        </section>
-        <Provenance snap={snap} />
+    <main className={`ing dc${morph ? ' rw-enter' : ''}`} aria-labelledby="center-title">
+      {morph && <ReviewWaiting leaving />}
+      <ScreenTitle title="Review accepted files" help="Close Ingestion before opening Context. This is not SOW approval." />
+      <Kpis label="Review summary" items={[
+        { value: parsed ? ingested.length : 0, label: 'Accepted & parsed', tone: parsed ? 'ok' : undefined },
+        { value: excluded + rejected.length, label: 'Excluded' },
+        { value: parseFailed ? ingested.length : 0, label: 'Parse errors', tone: parseFailed ? 'err' : undefined },
+      ]} />
+      {!ingested.length ? <p className="dc-none"><Icon name="tb-clipboard-check" size={16} />No files handed on yet. Standardize hands the uploads on once they are ready.</p> : (
+        <ul className="dc-list" aria-label="Accepted files">
+          {ingested.map(u => {
+            const f = std.find(x => x.u.id === u.id)
+            return <li key={u.id}><StatusMark className="rb-sm" size={16} color="var(--accent)" doneColor="var(--ok)" errorColor="var(--err)"
+                status={parsed ? 'done' : parseFailed ? 'failed' : snap.ingestion ? 'running' : 'pending'} /><div><strong className="dc-name">{u.name}</strong>
+              <span className="muted xs">Standardize: {f?.review ? 'Reviewed' : 'Passed'} · Parse: {parseText}</span></div>
+              <span className={`dc-pill ${parsed ? 'tone-ok' : parseFailed ? 'tone-err' : ''}`}>{parsed ? 'Accepted' : parseFailed ? 'Parse error' : 'Waiting'}</span></li>
+          })}
+        </ul>
+      )}
+      <section className="std-card">
+        <h3>Handoff to Context</h3>
+        <ul className="dc-list">
+          <li><Icon name="check" size={15} /><div><strong>Accepted and parsed files</strong><span className="muted xs">Source links and analysis copies retained</span></div><span className={`dc-pill ${parsed ? 'tone-ok' : ''}`}>{parsed ? 'Ready' : 'Waiting'}</span></li>
+          <li><Icon name="minus" size={15} /><div><strong>Excluded files</strong><span className="muted xs">Not sent to Context: removed, not ready, or refused at selection</span></div><span className="dc-pill">{excluded + rejected.length} excluded</span></li>
+        </ul>
+      </section>
+      <div className="dc-rows">
+        {held.length > 0 && <details open>
+          <summary><strong>Held for review</strong><span className="dc-count">{held.length}</span><Icon name="down" size={13} /></summary>
+          <ul className="dc-files">{held.map(f => <li key={f.u.id}><Icon name="alert" size={15} /><span className="dc-name">{f.u.name}</span><span className="muted xs">{STATE_TEXT[f.a.state]}{f.a.reason ? `: ${f.a.reason}` : ''} · not sent to Context</span></li>)}</ul>
+        </details>}
+        {notHandedOn.length > 0 && <details open>
+          <summary><strong>Not handed on</strong><span className="dc-count">{notHandedOn.length}</span><Icon name="down" size={13} /></summary>
+          <ul className="dc-files">{notHandedOn.map(f => <li key={f.u.id}><Icon name="file" size={15} /><span className="dc-name">{f.u.name}</span><span className="muted xs">{STATE_TEXT[f.a.state]}{f.a.reason ? `: ${f.a.reason}` : ''} · not sent to Context</span></li>)}</ul>
+        </details>}
+        {rejected.length > 0 && <details>
+          <summary><strong>Refused at selection</strong><span className="dc-count">{rejected.length}</span><Icon name="down" size={13} /></summary>
+          <ul className="dc-files">{rejected.map((r, i) => <li key={i}><Icon name="file" size={15} /><span className="dc-name">{r.name}</span><span className="muted xs">{r.reason}</span></li>)}</ul>
+        </details>}
       </div>
-    </div>
+    </main>
+  )
+}
+
+// ---- pinned footers (one primary action each) ------------------------------------------------------------------
+/** Upload's one action (16 Oct 2026 wireframes): Start opens Standardize, which hands the batch on by itself.
+ *  It waits for the click in the Ready state (no auto-advance from Upload). */
+export function UploadFooter({ snap }: { snap: Snapshot }) {
+  const all = useUploadRows(snap), rows = all.filter(isAdded)
+  const progress = uploadCount(all)
+  const busy = rows.some(r => r.state === 'uploading' || r.state === 'checking')
+  const ready = rows.filter(r => r.state === 'ready').length
+  // Locked until the goal is approved (approval gate): the footer says how to unlock Add files.
+  const locked = !useGoal(canAddFiles)
+  const status = locked && !rows.length ? 'Expand and approve the goal to unlock Add files.' : !rows.length ? 'Add files to continue' : progress ? `${progress.done} of ${progress.total} uploaded` : busy ? 'Checking the uploaded files' : !ready ? 'No file is ready yet' : 'Ready to start'
+  const t = tips('1.1', 'Start')
+  return <div className="ws-foot-in" role="status" aria-live="polite">
+    <div className="ws-foot-text">{progress ? <UploadProgress {...progress} /> : <span className="muted sm">{status}</span>}</div>
+    <Tip text={t.tip} note={status !== 'Ready to start' ? status : undefined}>
+      <button className="btn btn-primary" aria-disabled={status !== 'Ready to start' || undefined} onClick={() => { if (status === 'Ready to start') goScreen('1.8') }}>Start</button></Tip>
+  </div>
+}
+/** Parse is automated: status only; it opens Review when the extraction is done. A failure shows Retry. */
+export function ParseFooter({ snap }: { snap: Snapshot }) {
+  const rag = useRag(s => s)
+  const ex = rag.steps.find(x => x.key === 'extract')
+  const failed = rag.steps.slice(0, 2).find(x => x.status === 'failed')
+  const reason = !snap.ingestion ? 'Starts from Upload once every file is ready' : failed ? `${failed.label} failed` : ex?.status !== 'done' ? 'Parsing the standardized files' : undefined
+  useAdvanceWhen(!reason, () => goScreen('1.4'))
+  return <Foot title={reason ?? 'Extraction complete'} line="Extracted text and tables are linked to the source files">
+    {failed && <GateButton icon="refresh" {...tips('1.9', 'Retry')} onClick={() => ragPipeline.retry(failed.key)}>Retry</GateButton>}</Foot>
+}
+/** Some file has been handed on from Standardize (Review leaves its waiting state). */
+export const handedOn = (snap: Snapshot) => snap.uploads.some(u => snap.ingestion?.fileIds.includes(u.id))
+export function IngestReviewFooter({ snap }: { snap: Snapshot }) {
+  const rag = useRag(s => s)
+  const parsed = !!snap.ingestion && rag.steps.find(x => x.key === 'extract')?.status === 'done'
+  return <Foot title={parsed ? 'Accepted, parsed files only' : 'Waiting for parsed files'} line="Context receives the accepted, parsed files">
+    <GateButton variant="secondary" icon="edit" {...tips('1.4', 'Edit')} reason={snap.steps[0].editable ? undefined : 'Reopen Scope to change the intake batch'} onClick={() => goScreen('1.1')}>Edit</GateButton>
+    <GateButton icon="tb-clipboard-check" {...tips('1.4', 'Approve')} reason={parsed ? undefined : 'Parsing must finish first'} onClick={() => goScreen('2.5')}>Approve</GateButton></Foot>
+}
+
+// ---- Quarantine -------------------------------------------------------------------------------------------
+/** Files held out of ingestion, with the reason. There is no release or bypass: a held file never reaches RAG.
+ *  Rescan exists for failed scans only (the backend rule); Remove keeps the object in quarantine for audit. */
+export function Quarantine({ snap }: { snap: Snapshot }) {
+  const { busy, run } = useAction()
+  const editable = snap.steps[0].editable
+  const held = snap.uploads.filter(u => u.scan === 'blocked' || u.scanError)
+  const released = snap.uploads.filter(u => u.released)
+  return (
+    <main className="ing dc" aria-labelledby="center-title">
+      <ScreenTitle title="Quarantine" help="Files held out of ingestion, with the reason." details={<SecurityDetails snap={snap} />} />
+      {!held.length ? <p className="dc-none"><Icon name="shield" size={16} />No file is held.</p> : held.map(u => (
+        <section key={u.id} className="dc-held">
+          <div className="dc-held-main">
+            <Icon name="zip" size={16} />
+            <div><strong className="dc-name">{u.name}</strong><span className="muted xs">{u.scanError ? `Scan failed: ${u.scanError}` : scanView(u).text}</span></div>
+            <span className={`dc-pill ${u.scanError ? 'tone-warn' : 'tone-err'}`}>{u.scanError ? 'Scan error' : 'Held'}</span>
+          </div>
+          {editable && <div className="dc-held-actions">
+            {u.scanError && <button className="btn btn-outline" disabled={!!busy} onClick={() => run('Retry scan', () => api.retryScan(u.id), { step: 1 })}><Icon name="refresh" />Rescan</button>}
+            <button className="dc-quiet-btn" disabled={!!busy} onClick={() => run('Remove file', () => api.removeUpload(u.id), { step: 1 })}>Remove</button>
+          </div>}
+        </section>
+      ))}
+      <div className="dc-rows">
+        <details>
+          <summary><strong>Released</strong><span className="dc-count">{released.length}</span><Icon name="down" size={13} /></summary>
+          {released.length ? <FileRows files={released} /> : <p className="muted sm">No file released yet.</p>}
+        </details>
+      </div>
+    </main>
+  )
+}
+
+// ---- Connectors (optional) --------------------------------------------------------------------------------
+const SOURCES = [
+  { name: 'Google Drive', icon: 'cloud-up', desc: 'Folders and shared drives' },
+  { name: 'SharePoint', icon: 'db', desc: 'Sites and libraries' },
+  { name: 'S3', icon: 'folder', desc: 'Buckets and prefixes' },
+]
+export function Connectors({ snap }: { snap: Snapshot }) {
+  return (
+    <main className="ing dc" aria-labelledby="center-title">
+      <ScreenTitle title="Connectors" help="Optional. Pull documents from a connected source." details={<SecurityDetails snap={snap} />} />
+      <ul className="dc-list">
+        {SOURCES.map(c => (
+          <li key={c.name}>
+            <Icon name={c.icon} size={16} />
+            <div><strong>{c.name}</strong><span className="muted xs">{c.desc}</span></div>
+            {/* No connector service in this build: the button stays, disabled, with its reason in the tooltip. */}
+            <button className="btn btn-outline sm" aria-disabled title="Connector setup is not available yet" onClick={e => e.preventDefault()}>Connect</button>
+          </li>
+        ))}
+      </ul>
+    </main>
   )
 }

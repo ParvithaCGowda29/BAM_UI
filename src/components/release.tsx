@@ -14,7 +14,7 @@ const PILL: Record<CertState, Parameters<typeof StatusPill>[0]['status']> = {
 const PILL_TEXT: Record<CertState, string> = { pass: 'Pass', fail: 'Fail', pending: 'Pending', stale: 'Stale', running: 'Running', unavailable: 'Unavailable' }
 
 export function DemoTag() {
-  return DEMO_RUN ? <span className="demo-tag" title="Produced by the mock backend in this build; not a real service result">simulated</span> : null
+  return DEMO_RUN ? <span className="demo-tag" title="Example result for review; not produced by a live run">simulated</span> : null
 }
 
 export function CertChecklist({ snap, compact }: { snap: Snapshot; compact?: boolean }) {
@@ -50,7 +50,7 @@ const KIND_PILL: Record<VersionEntry['kind'], Parameters<typeof StatusPill>[0]['
 export function VersionHistory({ snap, limit }: { snap: Snapshot; limit?: number }) {
   const rows = [...snap.versions].reverse().slice(0, limit)
   const current = snap.workflow?.manifest?.hash
-  if (!rows.length) return <p className="muted sm">No manifest versions yet. The first draft is written when 4.1 activities A–C pass.</p>
+  if (!rows.length) return <p className="muted sm">No manifest versions yet. The first draft is written when the Template checks A–C pass.</p>
   return (
     <ol className="vhist">
       {rows.map((v, i) => (
@@ -99,7 +99,7 @@ export function LineDiff({ base, current, context = 2 }: { base: string; current
 export function ManifestCompare({ snap, link = true }: { snap: Snapshot; link?: boolean }) {
   const m = snap.workflow?.manifest
   const base = certifiedBaseline(snap)
-  if (!m) return <Empty icon="file" title="No draft manifest yet">The manifest is written when 4.1 activities A–C pass. Generate the ISATVON Contract in 3.2 to start.</Empty>
+  if (!m) return <Empty icon="file" title="No draft manifest yet">The manifest is written when the Template checks A–C pass. Generate the ISATVON Contract in the Skills grid to start.</Empty>
   const current = JSON.stringify(m, null, 2)
   return (
     <div className="mcompare">
@@ -111,7 +111,7 @@ export function ManifestCompare({ snap, link = true }: { snap: Snapshot; link?: 
       {!base ? <p className="muted sm"><strong>No certified version yet.</strong> This is the first build: nothing has passed the sandbox, assertions and review, so there is no release baseline to compare against. Generated data is not certified data.</p>
         : base.hash === m.hash ? <p className="muted sm"><Icon name="check" size={12} /> The draft is identical to the certified version (same hash).</p>
         : <LineDiff base={base.manifest} current={current} />}
-      {link && <button className="link sm" onClick={() => goScreen('4.2')}><Icon name="link" size={12} />Open 4.2 Manifest JSON</button>}
+      {link && <button className="link sm" onClick={() => goScreen('4.2')}><Icon name="link" size={12} />Open Manifest JSON</button>}
     </div>
   )
 }

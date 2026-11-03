@@ -38,11 +38,11 @@ test('locked 3.2: reason and action come from the same prerequisite', async () =
 
   await api.uploadFile({ name: 'rfq.pdf', size: 1000 }, () => {})
   b = prerequisite(await snap(), noRag, 2)!
-  assert.deepEqual([b.target, /virus-scanned/.test(b.reason)], ['1.1', true], 'uploaded but not ingested: points at the 1.1 scan gate')
+  assert.deepEqual([b.target, /Standardize/.test(b.reason), /scan|quarantin/i.test(b.reason)], ['1.8', true, false], 'uploaded but not ingested: points at Standardize, never at the internal scan')
   await until(async () => (await snap()).uploads[0].scan === 'verified')
   await api.startIngestionRun()
   b = prerequisite(await snap(), noRag, 2)!
-  assert.equal(b.target, '2.1', 'source exists, no SOW: points at the real blocker (RAG), not at upload')
+  assert.equal(b.target, '1.9', 'source exists, no SOW: points at the real blocker (the context build), not at upload')
   assert.doesNotMatch(b.reason, /no source|upload documents/i)
 
   await api.startSowGeneration()
@@ -50,7 +50,7 @@ test('locked 3.2: reason and action come from the same prerequisite', async () =
   assert.equal(b.target, '3.1', 'generating: open 3.1')
   await until(async () => !!(await snap()).sow)
   b = prerequisite(await snap(), ragDone, 2)!
-  assert.deepEqual([b.label, b.target], ['Review SOW', '3.1'])
+  assert.deepEqual([b.label, b.target], ['Open Scope', '3.1'])
   assert.match(b.reason, /v1 is a draft awaiting approval/)
 
   await api.approveSow(1)

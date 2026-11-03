@@ -58,17 +58,17 @@ export function buildOkfBundle(uploads: UploadRecord[], rag: Pick<RagState, 'run
       const out = g.edges.filter(e => e.source === n.id).map(e => ({ e, o: byId.get(e.target) })).filter(x => x.o)
       const inc = g.edges.filter(e => e.target === n.id).map(e => ({ e, o: byId.get(e.source) })).filter(x => x.o)
       files.push({ path: path(n).slice(1), content: doc({
-        type: n.type, title: n.label, description: `${n.type} in the Cognee knowledge graph: ${out.length + inc.length} relations.`,
+        type: n.type, title: n.label, description: `${n.type} in the context knowledge graph: ${out.length + inc.length} relations.`,
         tags: [slug(n.type), 'cognee'],
-        sources: [{ id: 'cognee', resource: `cognee://datasets/${rag.datasetId ?? 'bam-rfq'}`, title: 'Cognee knowledge graph' }],
+        sources: [{ id: 'cognee', resource: `cognee://datasets/${rag.datasetId ?? 'bam-rfq'}`, title: 'Context knowledge graph' }],
         generated: { by: cognee, at }, status: 'draft', stale_after: addDays(at, 90),
-      }, `# Relations\n\n${[...out.map(({ e, o }) => `* ${e.label}: [${o!.label}](${path(o!)})`), ...inc.map(({ e, o }) => `* ${e.label} (from): [${o!.label}](${path(o!)})`)].join('\n') || '* none'}\n\nFrom the Cognee graph build.[^cognee]\n\n[^cognee]: Cognee knowledge graph`) })
+      }, `# Relations\n\n${[...out.map(({ e, o }) => `* ${e.label}: [${o!.label}](${path(o!)})`), ...inc.map(({ e, o }) => `* ${e.label} (from): [${o!.label}](${path(o!)})`)].join('\n') || '* none'}\n\nFrom the context graph build.[^cognee]\n\n[^cognee]: Context knowledge graph`) })
     }
   } else if (extracted) for (const n of NODES) {
     const rel = EDGES.filter(e => e.source === n.id || e.target === n.id)
     const ids = n.sources.map(s => slug(s))
     files.push({ path: `entities/${slug(n.okfClass)}/${slug(n.label)}.md`, content: doc({
-      type: n.okfClass, title: n.label + (n.sub ?? ''), description: `${n.okfClass} extracted by Cognee: ${n.relations}.`,
+      type: n.okfClass, title: n.label + (n.sub ?? ''), description: `${n.okfClass} extracted by the Context Engine: ${n.relations}.`,
       tags: [slug(n.okfClass), 'extracted'],
       sources: n.sources.map(s => ({ id: slug(s), resource: `/sources/${slug(s)}.md`, title: s })),
       generated: { by: cognee, at }, status: 'draft', stale_after: addDays(at, 90), confidence: n.confidence,
@@ -83,7 +83,7 @@ export function buildOkfBundle(uploads: UploadRecord[], rag: Pick<RagState, 'run
     const draft = rag.drafts[s.name]
     const handoff = [...rag.handoffs].reverse().find(h => h.schema === s.name)
     files.push({ path: `schemas/${slug(s.name)}.md`, content: doc({
-      type: 'Pydantic Schema', title: s.name, description: `Fields: ${s.fields}.`, tags: ['schema', slug(s.okfSource.split(' · ')[0])],
+      type: 'Schema', title: s.name, description: `Fields: ${s.fields}.`, tags: ['schema', slug(s.okfSource.split(' · ')[0])],
       version: draft?.version, maps_to: s.mapsTo,
       sources: [{ id: 'okf-source', resource: s.okfSource }],
       generated: { by: draft?.editedAt ? reviewer : cognee, at: z(draft?.editedAt ?? at) },

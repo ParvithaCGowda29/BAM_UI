@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { useCustom, type BaseRecord } from '@refinedev/core'
 import { useQueryClient } from '@tanstack/react-query'
 import type { CodeFile, SkillRow, Snapshot, StepId } from '../api/types'
-import { toast } from './store'
-import { STEP_SCREEN } from '../tracker/trackerConfig.ts'
 
 // One shared poll of the backend snapshot; every status in the UI derives from it.
 export function useSnapshot() {
@@ -23,18 +21,17 @@ export function useCode(rev: string) {
   return { files: query.data?.data.files, error: query.error, isLoading: query.isLoading, refetch: query.refetch }
 }
 
-// Runs a backend command, reports failure as a persistent toast, then refreshes reads.
+// Runs a backend command, then refreshes reads. Failures are logged (no notices, removed 9 Oct 2026); the screen's own
+// state (button, status, gate reason) shows what happened, and the backend keeps refusing invalid operations.
 export function useAction() {
   const qc = useQueryClient()
   const [busy, setBusy] = useState<string | null>(null)
   async function run<T>(label: string, fn: () => Promise<T>, opts: { success?: string; step?: StepId } = {}): Promise<T | undefined> {
     setBusy(label)
     try {
-      const r = await fn()
-      if (opts.success) toast(opts.success, 'success', opts.step && STEP_SCREEN[opts.step])
-      return r
+      return await fn()
     } catch (e) {
-      toast(`${label} failed: ${(e as Error).message}`, 'error', opts.step && STEP_SCREEN[opts.step])
+      console.error(`${label} failed:`, (e as Error).message)
     } finally {
       setBusy(null)
       void qc.invalidateQueries()

@@ -11,15 +11,16 @@ export interface BamApi {
   getSkills(): Promise<SkillRow[]>
   getCode(): Promise<CodeFile[]>
   /** stageUpload: stores the file in private quarantine staging and starts an async BuLL*Sav virus scan (ClamAV engine via clamd in production). */
-  uploadFile(file: { name: string; size: number }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
+  uploadFile(file: { name: string; size: number; batchId?: string }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
   /** Removes a file from the active intake batch once the service confirms. A blocked object stays in quarantine (audit). Refused while scanning. */
   removeUpload(id: string): Promise<void>
   /** Rescans a file whose scan failed (outage, timeout, malformed verdict). */
   retryScan(id: string): Promise<void>
   /** Approved access for a released, Verified file only; refused for scanning, blocked or errored files. */
   getVerifiedFileAccess(id: string): Promise<{ url: string; expiresAt: string }>
-  /** Atomically re-checks the whole batch (scanGate) and starts one run for the released files. Rejects ineligible or repeated starts. */
-  startIngestionRun(): Promise<IngestionRun>
+  /** Atomically re-checks the whole batch (scanGate) and starts one run for the released files, or only `fileIds` of them
+   *  (Standardize hands on the ready files; held ones stay out). Rejects ineligible or repeated starts. */
+  startIngestionRun(fileIds?: string[]): Promise<IngestionRun>
   /** Mock-only controls (failure simulation, mixed-state fixture). An HTTP adapter leaves this undefined. */
   demo?: { setScanOutcome(o: ScanOutcome): void; loadScanFixture(): void }
   /** Generate (or retry) the SOW from the RAG context of the ingested (verified) uploads. */

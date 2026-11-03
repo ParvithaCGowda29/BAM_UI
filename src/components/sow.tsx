@@ -36,7 +36,11 @@ export function ReadonlySow({ html, highlight }: { html: string; highlight?: str
     root.querySelectorAll('.passage-hl').forEach(el => el.classList.remove('passage-hl'))
     if (!highlight) return
     const el = root.querySelector(`[data-passage="${CSS.escape(highlight)}"]`)
-    if (el) { el.classList.add('passage-hl'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }) }
+    if (!el) return
+    el.classList.add('passage-hl')
+    // After a dialog opening around it has moved focus (which scrolls), so the passage is what ends up in view.
+    const t = setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 80)
+    return () => clearTimeout(t)
   }, [highlight, editor])
   return <div ref={box} className="sow-doc readonly"><EditorContent editor={editor} aria-label="Approved SOW (read-only)" /></div>
 }

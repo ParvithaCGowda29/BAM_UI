@@ -1,0 +1,155 @@
+import { describe, expect, it } from "vitest";
+import { LineDecoderStream } from "./LineDecoderStream";
+
+async function collectLines(stream: ReadableStream<string>): Promise<string[]> {
+  const reader = stream.getReader();
+  const lines: string[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    lines.push(value);
+  }
+  return lines;
+}
+
+function createTextStream(chunks: string[]): ReadableStream<string> {
+  return new ReadableStream<string>({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(chunk);
+      }
+      controller.close();
+    },
+  });
+}
+
+describe("LineDecoderStream", () => {
+  it("should split lines on LF (\\n)", async () => {
+    const stream = createTextStream(["line1\nline2\nline3\n"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "line2", "line3"]);
+  });
+
+  it("should split lines on CRLF (\\r\\n)", async () => {
+    const stream = createTextStream(["line1\r\nline2\r\nline3\r\n"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "line2", "line3"]);
+  });
+
+  it("should split lines on CR (\\r)", async () => {
+    const stream = createTextStream(["line1\rline2\rline3\r"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "line2", "line3"]);
+  });
+
+  it("should handle CR line endings split across chunks", async () => {
+    const stream = createTextStream(["line1\r", "line2\r", "line3\r"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "line2", "line3"]);
+  });
+
+  it("should handle CRLF split across chunks", async () => {
+    // The \r is at the end of one chunk and \n at the start of the next
+    const stream = createTextStream(["line1\r", "\nline2\r\n"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "line2"]);
+  });
+
+  it("should handle empty lines with LF", async () => {
+    const stream = createTextStream(["line1\n\nline2\n"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "", "line2"]);
+  });
+
+  it("should handle empty lines with CRLF", async () => {
+    const stream = createTextStream(["line1\r\n\r\nline2\r\n"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "", "line2"]);
+  });
+
+  it("should handle empty lines with CR", async () => {
+    const stream = createTextStream(["line1\r\rline2\r"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "", "line2"]);
+  });
+
+  it("should handle mixed standard line endings", async () => {
+    const stream = createTextStream(["line1\nline2\r\nline3\r"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "line2", "line3"]);
+  });
+
+  it("should handle multiple chunks", async () => {
+    const stream = createTextStream(["li", "ne1\nli", "ne2\n"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(["line1", "line2"]);
+  });
+
+  it("should throw on incomplete line at end of stream", async () => {
+    const stream = createTextStream(["line1\nincomplete"]);
+    await expect(
+      collectLines(stream.pipeThrough(new LineDecoderStream())),
+    ).rejects.toThrow("Stream ended with an incomplete line");
+  });
+
+  it("should reject a fragmented line that exceeds the configured limit", async () => {
+    const stream = createTextStream(["1234", "5"]);
+    const decoder = new LineDecoderStream({ maxLineLength: 4 });
+    await expect(collectLines(stream.pipeThrough(decoder))).rejects.toThrow(
+      "Stream line exceeds maxLineLength (5 > 4)",
+    );
+    expect((decoder as unknown as { buffer: string }).buffer).toBe("");
+  });
+
+  it("should reject a complete line that exceeds the configured limit", async () => {
+    const stream = createTextStream(["12345\n"]);
+    await expect(
+      collectLines(
+        stream.pipeThrough(new LineDecoderStream({ maxLineLength: 4 })),
+      ),
+    ).rejects.toThrow("Stream line exceeds maxLineLength (5 > 4)");
+  });
+
+  it("should accept lines that reach exactly the configured limit", async () => {
+    const stream = createTextStream(["1234\n", "12", "34\n"]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream({ maxLineLength: 4 })),
+    );
+    expect(lines).toEqual(["1234", "1234"]);
+  });
+
+  it("should validate the configured line limit", () => {
+    expect(() => new LineDecoderStream({ maxLineLength: 0 })).toThrow(
+      "maxLineLength must be a positive safe integer",
+    );
+  });
+
+  it("should handle SSE-like data with CRLF", async () => {
+    const sseData = 'data: {"type":"text"}\r\n\r\ndata: [DONE]\r\n\r\n';
+    const stream = createTextStream([sseData]);
+    const lines = await collectLines(
+      stream.pipeThrough(new LineDecoderStream()),
+    );
+    expect(lines).toEqual(['data: {"type":"text"}', "", "data: [DONE]", ""]);
+  });
+});

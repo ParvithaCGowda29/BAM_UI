@@ -1,7 +1,7 @@
 // Pure presentation rules for the shared BAM action button and the 4-stage tracker (tested in bamUi.test.ts).
 import type { TrackerStatus } from '../tracker/trackerConfig.ts'
 
-export type BamAction = 'ingest' | 'generate' | 'validate' | 'deploy' | 'approve' | 'save'
+export type BamAction = 'ingest' | 'generate' | 'validate' | 'deploy' | 'approve' | 'save' | 'review' | 'commit'
 export const BAM_ACTIONS: Record<BamAction, { icon: string; loading: string; success: string }> = {
   ingest: { icon: 'ingest', loading: 'Ingesting…', success: 'Ingested' },
   generate: { icon: 'sparkle', loading: 'Generating…', success: 'Generated' },
@@ -9,6 +9,8 @@ export const BAM_ACTIONS: Record<BamAction, { icon: string; loading: string; suc
   deploy: { icon: 'rocket', loading: 'Deploying…', success: 'Deployed' },
   approve: { icon: 'doccheck', loading: 'Approving…', success: 'Approved' },
   save: { icon: 'save', loading: 'Saving…', success: 'Saved' },
+  review: { icon: 'eye', loading: 'Signing off…', success: 'Signed off' },
+  commit: { icon: 'db', loading: 'Committing…', success: 'Committed' },
 }
 export const SUCCESS_MS = 1800
 
@@ -35,3 +37,6 @@ export function stageMarkers(statuses: readonly TrackerStatus[]) {
   const earned = statuses.slice(0, -1).map((s, i) => s === 'done' && statuses[i + 1] !== 'not_started')
   return { current, markers, earned }
 }
+
+/** "1 file", "2 files"; pass the plural form when it is not just "+s" ("1 batch", "2 batches"). */
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`

@@ -49,3 +49,18 @@ test('hand-off creates a Workbench draft with the pinned context version; edits 
   assert.equal(h.contextVersion, svc.getState().runId)
   assert.deepEqual(Object.keys(h).sort(), ['at', 'contextVersion', 'schema', 'version'], 'no approval field')
 })
+
+test('centredViewport puts the root at the canvas centre and keeps every node inside', async () => {
+  const { centredViewport } = await import('./ragPipeline.ts')
+  const pts = [{ x: 400, y: 250, r: 48 }, { x: 700, y: 290, r: 34 }, { x: 150, y: 340, r: 34 }]
+  for (const [w, h] of [[860, 560], [330, 380]]) {
+    const v = centredViewport(pts, pts[0], w, h)
+    assert.equal(pts[0].x * v.zoom + v.x, w / 2)
+    assert.equal(pts[0].y * v.zoom + v.y, h / 2)
+    for (const p of pts) {
+      assert.ok((p.x - p.r) * v.zoom + v.x >= 0 && (p.x + p.r) * v.zoom + v.x <= w)
+      assert.ok((p.y - p.r) * v.zoom + v.y >= 0 && (p.y + p.r) * v.zoom + v.y <= h)
+    }
+  }
+  assert.deepEqual(centredViewport(pts, pts[0], 860, 560), centredViewport(pts, pts[0], 860, 560))
+})

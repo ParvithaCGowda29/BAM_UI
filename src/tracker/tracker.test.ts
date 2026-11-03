@@ -1,47 +1,73 @@
 // npm test  (Node's built-in runner; no extra dependencies)
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { SCREEN_ROUTES, STEP_SCREEN, SUBTASKS, screenByPath, TASKS, TRACKER_ITEMS, initialStatuses, rollup, subtasksOf, taskStatus } from './trackerConfig.ts'
+import { GLOBAL_ROUTES, ROUTE_ALIASES, SCREEN_ROUTES, STEP_SCREEN, SUBTASKS, countedOf, globalByPath, screenByPath, screenLabel, TASKS, TRACKER_ITEMS, initialStatuses, rollup, subtasksOf, taskStatus } from './trackerConfig.ts'
 import { LEGACY_TRACKER_KEY, TRACKER_KEY, localTrackerStorage } from './trackerStorage.ts'
 
-const EXPECTED: Record<string, string> = {
-  '1': 'Data Ingestion',
-  '1.1': 'Intake console: upload & virus scan', '1.2': 'Ingestion queue/jobs', '1.3': 'File detail/preview', '1.4': 'Ingestion review',
-  '2': 'RAG',
-  '2.1': 'Context graph explorer',
-  '3': 'FDE Workbench',
-  '3.1': 'SOW generation and approval', '3.2': 'ISATVON skills grid', '3.3': 'Skills/code review', '3.4': 'Manifest and deploy prep',
-  '4': 'Sandbox',
-  '4.1': 'Activities', '4.2': 'Manifest JSON', '4.3': 'Generated code', '4.4': 'Sandbox and assertions',
+// Final workflow (15 Oct 2026): stage > steps in nav order, by stable ID. Labels are names, never numbers.
+const NAV: Record<string, [string, string[]]> = {
+  '1': ['Ingestion', ['Upload', 'Standardize', 'Parse', 'Review']],
+  '2': ['Context', ['Sync', 'Index', 'Schema', 'Verify']],
+  '3': ['Workbench', ['Scope', 'Grid', 'Template', 'Translate']],
+  '4': ['Validation', ['Sandbox', 'Check', 'Certify', 'Commit']],
+}
+const ICONS: Record<string, string> = {
+  '1': 'tb-inbox', '2': 'tb-git-branch', '3': 'tb-briefcase', '4': 'tb-shield-check',
+  Upload: 'tb-upload', Standardize: 'tb-transform', Parse: 'tb-file-code', Review: 'tb-clipboard-check', Sync: 'tb-refresh', Index: 'tb-search', Schema: 'tb-schema', Verify: 'tb-shield-check',
+  Scope: 'tb-target', Grid: 'tb-table', Template: 'tb-template', Translate: 'tb-code', Sandbox: 'tb-box', Check: 'tb-list-check', Certify: 'tb-certificate', Commit: 'tb-database-import',
 }
 
-test('registry: 4 stages, 13 screens (2.2–2.4 removed 9 Oct 2026) with the agreed IDs and labels', () => {
-  assert.equal(TASKS.length, 4)
-  assert.equal(SUBTASKS.length, 13)
-  assert.deepEqual(TASKS.map(t => subtasksOf(t.id).length), [4, 1, 4, 4])
-  assert.deepEqual(Object.fromEntries(TRACKER_ITEMS.map(i => [i.id, i.label])), EXPECTED)
-  assert.equal(new Set(TRACKER_ITEMS.map(i => i.id)).size, TRACKER_ITEMS.length)
+test('registry: 4 stages with the final steps in navigation order', () => {
+  assert.deepEqual(TASKS.map(t => t.id), ['1', '2', '3', '4'])
+  for (const t of TASKS) assert.deepEqual([t.label, subtasksOf(t.id).map(s => s.label)], NAV[t.id], t.label)
+  assert.equal(new Set(TRACKER_ITEMS.map(i => i.id)).size, TRACKER_ITEMS.length, 'unique IDs')
 })
 
-test('config: no old 21-item labels and no excluded areas', () => {
-  const labels = TRACKER_ITEMS.map(i => i.label).join(' | ')
-  for (const old of ['Upload discovery documents', 'Generate SOW', 'Retry or use fallback', 'Hot-reload into Skill Palette', 'Load approved SOW'])
-    assert.ok(!labels.includes(old), old)
-  assert.ok(!/jinja|masters|admin|client sri/i.test(labels))
+test('icons: the Tabler map for every stage and step; scan and quarantine stay internal', () => {
+  for (const t of TASKS) assert.equal(t.icon, ICONS[t.id], t.label)
+  for (const t of TASKS) for (const s of subtasksOf(t.id)) assert.equal(s.icon, ICONS[s.label], s.label)
+  for (const id of ['1.5', '1.7', '1.3']) {
+    const s = SUBTASKS.find(x => x.id === id)!
+    assert.ok(s.hidden && s.internal, `${s.label} is internal`)
+  }
+  assert.ok(!TRACKER_ITEMS.some(i => /upload\s*&\s*scan/i.test(i.label)))
 })
 
-test('routes: one registry; every screen has a unique stable route; 4.2/4.3 share step 3 gating with 4.1', () => {
-  assert.deepEqual(Object.fromEntries(Object.entries(SCREEN_ROUTES).map(([k, v]) => [k, v.path])), {
-    '1.1': '/ingestion', '1.2': '/ingestion/queue', '1.3': '/ingestion/file', '1.4': '/ingestion/review',
-    '2.1': '/rag/graph',
-    '3.1': '/workbench/sow', '3.2': '/workbench/skills', '3.3': '/workbench/review', '3.4': '/workbench/release',
-    '4.1': '/sandbox/validation', '4.2': '/sandbox/manifest', '4.3': '/sandbox/code', '4.4': '/sandbox/results',
-  })
-  assert.deepEqual(SUBTASKS.map(x => x.id).sort(), Object.keys(SCREEN_ROUTES).sort(), 'every tracker screen is routed')
-  assert.equal(new Set(Object.values(SCREEN_ROUTES).map(r => r.path)).size, 13, 'unique paths')
-  assert.deepEqual(['4.1', '4.2', '4.3'].map(id => SCREEN_ROUTES[id].step), [3, 3, 3])
-  assert.deepEqual(STEP_SCREEN, { 1: '3.1', 2: '3.2', 3: '4.1', 4: '4.4' })
+test('labels: no numeric prefixes, every screen has an icon', () => {
+  for (const i of TRACKER_ITEMS) {
+    assert.ok(!/^(step\s*)?\d/i.test(i.label), `${i.id} label starts with a number: ${i.label}`)
+    assert.ok(i.icon, `${i.id} has an icon`)
+    assert.equal(screenLabel(i.id), i.label, 'screenLabel is the name, never the ID')
+  }
+})
+
+test('global destinations: Usage & improvement and Admin are not workflow screens', () => {
+  assert.equal(GLOBAL_ROUTES.usage.label, 'Usage & improvement')
+  assert.equal(globalByPath('/usage'), 'usage')
+  assert.equal(globalByPath('/admin/masters'), 'admin')
+  assert.ok(!SUBTASKS.some(s => /usage|workflows|agents|admin/i.test(s.label)), 'no left-rail Usage / Workflows / Agents entries')
+})
+
+test('counting: hidden and optional screens never count toward a stage', () => {
+  assert.deepEqual(countedOf('1').map(s => s.label), ['Upload', 'Standardize', 'Parse', 'Review'])
+  const s = initialStatuses()
+  for (const x of countedOf('1')) s[x.id] = 'done'
+  assert.equal(taskStatus('1', s), 'done', 'Connectors (optional) and File detail (hidden) do not hold the stage back')
+})
+
+test('routes: unique, resolvable, gated as before; old paths alias to the new ones', () => {
+  const paths = Object.values(SCREEN_ROUTES).map(r => r.path)
+  assert.equal(new Set(paths).size, paths.length, 'unique paths')
   for (const s of SUBTASKS) assert.equal(screenByPath(s.path!)?.id, s.id, `${s.path} resolves back to ${s.id}`)
+  assert.deepEqual(['4.1', '4.2', '4.3'].map(id => SCREEN_ROUTES[id].step), [3, 3, 3])
+  assert.deepEqual(['1.1', '1.5'].map(id => SCREEN_ROUTES[id].step), [1, 1], 'Upload and Scan share the intake gate')
+  assert.deepEqual(['4.8', '4.4', '4.5', '4.6', '4.7'].map(id => SCREEN_ROUTES[id].step), [4, 4, 4, 4, 4])
+  assert.deepEqual(STEP_SCREEN, { 1: '3.1', 2: '3.2', 3: '4.2', 4: '4.8' })
+  for (const [from, to] of Object.entries(ROUTE_ALIASES)) {
+    assert.ok(screenByPath(to), `${from} → ${to} resolves`)
+    assert.equal(screenByPath(from), undefined, `${from} is only an alias`)
+  }
+  assert.equal(ROUTE_ALIASES['/ingestion'], '/ingestion/upload', 'old combined Upload & scan route → Upload')
   assert.equal(screenByPath('/nope'), undefined)
 })
 
@@ -66,8 +92,8 @@ test('rollup: any started → in progress; nothing started → not started; empt
 
 test('taskStatus uses only that stage’s screens', () => {
   const s = initialStatuses()
-  for (const x of subtasksOf('1')) s[x.id] = 'done'
-  s['2.1'] = 'needs_review'
+  for (const x of countedOf('1')) s[x.id] = 'done'
+  s['2.2'] = 'needs_review'
   assert.equal(taskStatus('1', s), 'done')
   assert.equal(taskStatus('2', s), 'needs_review')
   assert.equal(taskStatus('4', s), 'not_started')
@@ -82,7 +108,7 @@ test('persistence: new namespace; all screens start not started', async () => {
   assert.notEqual(TRACKER_KEY, LEGACY_TRACKER_KEY)
   const r = await localTrackerStorage(memory()).load()
   assert.equal(r.error, undefined)
-  assert.equal(Object.keys(r.statuses).length, 13)
+  assert.equal(Object.keys(r.statuses).length, SUBTASKS.length)
   assert.ok(Object.values(r.statuses).every(v => v === 'not_started'))
 })
 
@@ -99,7 +125,7 @@ test('persistence: old 21-item data is not read, migrated, overwritten or delete
 test('persistence: round-trips by stable screen ID under one versioned key', async () => {
   const mem = memory()
   const s = initialStatuses()
-  s['1.1'] = 'done'; s['4.4'] = 'needs_review'; s['2.1'] = 'blocked'
+  s['1.1'] = 'done'; s['4.4'] = 'needs_review'; s['2.3'] = 'blocked'
   await localTrackerStorage(mem).save(s)
   assert.deepEqual([...mem.data.keys()], [TRACKER_KEY])
   const saved = JSON.parse(mem.data.get(TRACKER_KEY)!)

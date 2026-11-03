@@ -6,12 +6,16 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "check": "node --experimental-strip-types src/api/mock.check.ts",
-    "test": "node --experimental-strip-types --test src/tracker/tracker.test.ts src/tracker/evidence.test.ts src/rag/ragPipeline.test.ts src/lib/sowDiff.test.ts src/lib/repair.test.ts src/lib/bamUi.test.ts src/api/scanGate.test.ts src/rag/okf.test.ts src/rag/cognee.test.ts server/laya-judge/judge.test.ts"
+    "test": "node --experimental-strip-types --test src/tracker/tracker.test.ts src/tracker/evidence.test.ts src/rag/ragPipeline.test.ts src/lib/sowDiff.test.ts src/lib/repair.test.ts src/lib/bamUi.test.ts src/lib/assistant.test.ts src/api/scanGate.test.ts src/api/standardize.test.ts src/api/fileKind.test.ts src/lib/goal.test.ts src/rag/okf.test.ts src/rag/cognee.test.ts server/laya-judge/judge.test.ts",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "type": "module",
   "dependencies": {
+    "@assistant-ui/react": "^0.15.28",
     "@monaco-editor/react": "^4.7.0",
     "@refinedev/core": "^5.0.12",
+    "@tabler/icons-react": "^3.49.0",
     "@tanstack/react-query": "^5.104.1",
     "@tiptap/pm": "^3.31.4",
     "@tiptap/react": "^3.31.4",
@@ -22,13 +26,20 @@
     "@xyflow/react": "^12.12.0",
     "ag-grid-community": "^36.2.0",
     "ag-grid-react": "^36.2.0",
+    "motion": "^12.23.12",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "react-filerobot-image-editor": "5.0.0-beta.159",
+    "react-konva": "19.3.2",
+    "styled-components": "6.6.0"
   },
   "devDependencies": {
+    "@storybook/addon-docs": "^10.6.3",
+    "@storybook/react-vite": "^10.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "storybook": "^10.6.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.2"
   },

@@ -1,210 +1,266 @@
-// 1.1 Intake console: upload & virus scan. Files are staged in quarantine and scanned; only released, Verified
-// files can enter RAG, and only through "Start ingestion run". Every scan state comes from the backend snapshot;
+// Ingestion Upload and Scan (one intake component, so both share the same Uppy instance, files, batch and run:
+// moving between them never uploads twice or restarts a scan). Each file is scanned automatically after upload. Only
+// released, Verified files can enter RAG, and only through "Start ingestion" (the pinned footer, IngestionFlow.tsx). Every scan state comes from the backend snapshot;
 // the eligibility rule is the same pure check the backend enforces (api/scanGate.ts).
 // Every selection (browse, drop, many files, folder, ZIP) is triaged first: incompatible files are filtered out,
 // then the user chooses what fits the batch (25 files, 250 MB) before Upload turns on.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import Uppy from '@uppy/core'
 import { useUppyState } from '@uppy/react'
+import Dashboard from '@uppy/react/dashboard'
+import '@uppy/core/css/style.min.css'
+import '@uppy/dashboard/css/style.min.css'
 import { api } from '../api/adapter'
 import type { ScanOutcome } from '../api/adapter'
-import { ACCEPTED_TYPES, AV_NAME, AV_VENDOR, CHUNK_BYTES, chunkCount, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_UPLOAD_BYTES, type ScanEvent, type Snapshot, type UploadRecord } from '../api/types'
-import { autoPick, chunkNames, fit, ingestionBlock, scanView, triage, type ScanAction, type Triage } from '../api/scanGate.ts'
+import { ACCEPTED_TYPES, AV_NAME, REPEL_NAME, CHUNK_BYTES, chunkCount, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_UPLOAD_BYTES, type ScanEvent, type Snapshot, type UploadRecord } from '../api/types'
+import { autoPick, chunkNames, extOf, fit, triage, MAX_MULTI_BATCH_FILES, MAX_MULTI_BATCH_BYTES, SYSTEM_FILE_LABEL, type Triage } from '../api/scanGate.ts'
 import type { StepProps } from '../App'
 import { useAction } from '../lib/data'
-import { setUi, toast, uploadFiles, uppy } from '../lib/store'
-import { goScreen } from '../lib/route'
-import { DEMO_RUN, demoControls } from '../lib/demo'
-import { isRunning, ragPipeline, useRag } from '../rag/ragPipeline.ts'
+import { setUi, uploadFiles, uppy, useUi } from '../lib/store'
+import { demoControls } from '../lib/demo'
 import { PipelineCard } from '../rag/RagScreens'
-import { buildOkfBundle } from '../rag/okf.ts'
-import { useUploadsInFlight } from '../components/shell'
-import { Dialog, Empty, GateButton, Icon, StatusPill, Time, fmtBytes } from '../components/ui'
+import { Dialog, Icon, Time, fmtBytes } from '../components/ui'
+import { plural } from '../lib/bamUi.ts'
+import { ScanTable, ScreenTitle, SecurityDetails } from './IngestionFlow'
+import { UploadResults, setPickHandler } from './UploadPanes'
+import { addFilesLocked } from '../lib/goal.ts'
 
 const TYPES_LABEL = ACCEPTED_TYPES.map(t => t.slice(1).toUpperCase()).join(', ')
 const MB = (n: number) => `${Math.round(n / 1048576)} MB`
-type Filter = 'all' | UploadRecord['scan']
 type Source = 'files' | 'folder' | 'zip' | 'drop'
 
-const HOWTO: { key: Exclude<Source, 'drop'>; icon: string; title: string; button: string; steps: string[] }[] = [
-  { key: 'files', icon: 'file', title: 'Many files', button: 'Choose files', steps: [
-    'In the file picker, press Ctrl+A (Cmd+A on Mac) for everything, or Ctrl/Cmd-click and Shift-click to pick several.',
-    `Up to ${MAX_BATCH_FILES} files and ${MB(MAX_BATCH_BYTES)} per batch. Files over ${MB(CHUNK_BYTES)} are sent automatically in ${MB(CHUNK_BYTES)} chunks.`,
-  ] },
-  { key: 'folder', icon: 'expand', title: 'A whole folder', button: 'Choose folder', steps: [
-    'Every file inside, including subfolders, is checked before anything uploads.',
-    'System files (.DS_Store, Thumbs.db, desktop.ini, ~$ temp files) are skipped.',
-    `More than ${MAX_BATCH_FILES} files? Upload one subfolder at a time, or ZIP related documents together.`,
-  ] },
-  { key: 'zip', icon: 'db', title: 'ZIP archive', button: 'Choose ZIP', steps: [
-    'Windows: select the files, right-click, Send to, Compressed (zipped) folder.',
-    'macOS: select the files, right-click, Compress.',
-    `A ZIP counts as one file and can use the whole ${MB(MAX_UPLOAD_BYTES)} batch (sent in ${MB(CHUNK_BYTES)} chunks). It is scanned as an archive; password-protected ZIPs cannot be scanned.`,
-  ] },
-]
-/** Native pickers: the browser builds the file list; nothing reaches the uploader until it passes triage and fits the batch. */
-function Picker({ source, onPick, children, disabled, className = 'btn btn-secondary sm' }: {
-  source: Exclude<Source, 'drop'>; onPick: (l: FileList, s: Source) => void; children: React.ReactNode; disabled?: boolean; className?: string
-}) {
-  const input = useRef<HTMLInputElement | null>(null)
-  return <>
-    <button type="button" className={className} disabled={disabled} onClick={() => input.current?.click()}>{children}</button>
-    <input ref={el => { input.current = el; if (el && source === 'folder') el.setAttribute('webkitdirectory', '') }} type="file" hidden
-      multiple={source !== 'zip' || undefined} accept={source === 'zip' ? '.zip' : source === 'files' ? ACCEPTED_TYPES.join(',') : undefined}
-      onChange={e => { if (e.target.files) onPick(e.target.files, source); e.target.value = '' }} />
-  </>
-}
-
-function BulkDialog({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (l: FileList, s: Source) => void }) {
-  return (
-    <Dialog open={open} title="Bulk upload" onClose={onClose} className="dialog wide"
-      footer={<button className="btn btn-secondary" onClick={onClose}>Close</button>}>
-      <p className="muted sm">Pick as much as you like: incompatible files are filtered out first, then you choose what goes into this batch ({TYPES_LABEL}; up to {MAX_BATCH_FILES} files and {MB(MAX_BATCH_BYTES)}). Files over {MB(CHUNK_BYTES)} are sent as {MB(CHUNK_BYTES)} chunks. Everything is quarantined and virus-scanned before anything else.</p>
-      <div className="howto">
-        {HOWTO.map(h => (
-          <section key={h.key} className="howto-card">
-            <header><span className="howto-icon"><Icon name={h.icon} size={14} /></span><strong>{h.title}</strong></header>
-            <ol>{h.steps.map(s => <li key={s}>{s}</li>)}</ol>
-            <Picker source={h.key} onPick={onPick} className="btn btn-primary sm">{h.button}</Picker>
-          </section>
-        ))}
-      </div>
-      <p className="faint xs"><Icon name="question" size={11} /> Name files so they explain themselves (for example "RFQ-0147 Requirements v2.pdf"), one topic per file: extraction in RAG works better.</p>
-    </Dialog>
-  )
-}
-
-export interface Review { source: Source; t: Triage<File> }
+/** `dupes`: usable files already in this intake (same name and size), kept so the review accounts for every file picked. */
+export interface Review { source: Source; t: Triage<File>; dupes: File[] }
 type Existing = { count: number; bytes: number }
 // ponytail: renders the first 400 usable files; a bigger folder should be narrowed before picking.
 const LIST_CAP = 400
 
-// Uppy-style file tiles: a coloured preview per type, shrinking as the selection grows.
-const FILE_TYPES: Record<string, { label: string; color: string }> = {
-  '.pdf': { label: 'PDF', color: '#E2514A' }, '.docx': { label: 'DOCX', color: '#2B579A' }, '.xlsx': { label: 'XLSX', color: '#217346' },
-  '.pptx': { label: 'PPTX', color: '#D24726' }, '.txt': { label: 'TXT', color: '#5A5E69' }, '.zip': { label: 'ZIP', color: '#00A88E' },
+// The review step uses Uppy's own Dashboard on a separate, upload-less Uppy instance that holds exactly the CHOSEN
+// files: removing a file in the Dashboard deselects it, adding one there passes the same type/size rules. Upload
+// hands the chosen File objects to the one shared uploader (lib/store.ts), so nothing else changes.
+const reviewUppy = new Uppy({ id: 'bam-review', autoProceed: false, restrictions: { allowedFileTypes: ACCEPTED_TYPES, maxFileSize: MAX_UPLOAD_BYTES } })
+const GRID_H = 420, GAP = 10, PAD = 12, LABEL = 32, MIN_TILE = 64, MAX_TILE = 132
+/** Largest tile width (px) at which n tiles fit a box `w` wide and GRID_H tall; MIN_TILE (then scroll) past that. */
+export function fitTile(n: number, w: number) {
+  for (let t = MAX_TILE; t > MIN_TILE; t -= 2) {
+    const cols = Math.max(1, Math.floor((w - 2 * PAD + GAP) / (t + GAP))), rows = Math.ceil(n / cols)
+    if (rows * (t * 0.78 + LABEL) + (rows - 1) * GAP + 2 * PAD <= GRID_H) return t
+  }
+  return MIN_TILE
 }
-const fileType = (name: string) => FILE_TYPES[name.slice(name.lastIndexOf('.')).toLowerCase()] ?? { label: 'FILE', color: '#7B8BA3' }
-const tileSize = (n: number) => (n <= 5 ? 150 : n <= 12 ? 104 : n <= 24 ? 92 : n <= 48 ? 80 : 70)
+const EXT_TONE: Record<string, string> = { pdf: 'var(--err)', zip: 'var(--ok)', xlsx: 'var(--ok)', docx: 'var(--accent)', pptx: 'var(--warn)' }
+
+/** Review tiles (replace Uppy's file grid, which is fixed at 5 per row and 200px rows): every tile shrinks as the
+ *  selection grows so the whole selection fits one box. reviewUppy stays the selection; × removes from it. */
+function FitGrid({ files }: { files: Record<string, { id: string; name?: string; size: number | null; data: unknown }> }) {
+  const ref = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null)
+  const [w, setW] = useState(900)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width)); ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  // Filename filter (display only: the selection itself never changes).
+  const [q, setQ] = useState('')
+  const all = Object.values(files)
+  const list = q.trim() ? all.filter(f => (f.name ?? '').toLowerCase().includes(q.trim().toLowerCase())) : all
+  const tile = fitTile(list.length, w)
+  const add = (fl: FileList | null) => {
+    if (addFilesLocked()) return
+    for (const f of Array.from(fl ?? [])) try { reviewUppy.addFile({ name: f.name, type: f.type, data: f, source: 'review' }) } catch { /* dupes / restrictions: skipped */ }
+    if (input.current) input.current.value = ''
+  }
+  return (
+    <div ref={ref} className="fit-grid-wrap" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files) }}>
+      <div className="fit-grid-bar">
+        <input type="search" className="fit-search" value={q} onChange={e => setQ(e.target.value)} placeholder="Filter by file name" aria-label="Filter files by name" />
+        <span className="muted xs">{TYPES_LABEL} · remove a file to leave it out of this batch</span>
+        <button className="link sm" disabled={addFilesLocked()} onClick={() => { if (!addFilesLocked()) input.current?.click() }}><Icon name="plus" size={12} />Add more</button>
+        <input ref={input} type="file" multiple hidden accept={ACCEPTED_TYPES.join(',')} onChange={e => add(e.target.files)} />
+      </div>
+      {!list.length && <p className="muted sm fit-empty" role="status">No files match</p>}
+      <ul className="tile-grid fit" hidden={!list.length} style={{ '--tile': `${tile}px`, maxHeight: GRID_H } as React.CSSProperties} aria-label={`${list.length} chosen files`}>
+        {list.map(f => {
+          const ext = extOf(f.name ?? '').replace('.', '')
+          return <li key={f.id} className="tile on" style={{ '--ft': EXT_TONE[ext] ?? 'var(--muted)' } as React.CSSProperties} title={f.name}>
+            <div className="tile-preview"><span className="tile-doc"><span className="tile-ext">{ext.toUpperCase()}</span></span>
+              <button className="tile-x" aria-label={`Remove ${f.name}`} onClick={() => reviewUppy.removeFile(f.id)}><Icon name="x" size={10} /></button>
+            </div>
+            <span className="tile-name">{f.name}</span>
+            <span className="tile-size">{fmtBytes(f.size ?? 0)}</span>
+          </li>
+        })}
+      </ul>
+    </div>
+  )
+}
+function setReviewFiles(files: File[]) {
+  reviewUppy.clear()
+  if (!files.length) return
+  try {
+    reviewUppy.addFiles(files.slice(0, LIST_CAP).map(f => ({ name: f.name, type: f.type, data: f, source: 'review', meta: { relativePath: f.webkitRelativePath || null } })))
+  } catch { /* restriction failures are shown by the Dashboard */ }
+}
+
+type RowStatus = 'usable' | 'failed' | 'filtered'
+interface SelRow { file: File; status: RowStatus; reason?: string; label?: string }
+/** One list for every file in the selection; the rows, the summary and the status filter all read it, so they add up. */
+function selectionRows({ t, dupes }: Review): SelRow[] {
+  return [
+    ...t.usable.map(file => ({ file, status: 'usable' as const })),
+    ...t.unsupported.map(file => ({ file, status: 'failed' as const, reason: `Unsupported type (${extOf(file.name)})` })),
+    ...t.empty.map(file => ({ file, status: 'failed' as const, reason: 'Empty file' })),
+    ...t.tooLarge.map(file => ({ file, status: 'failed' as const, reason: `Too large (over ${MB(MAX_UPLOAD_BYTES)})` })),
+    ...dupes.map(file => ({ file, status: 'filtered' as const, reason: 'Duplicate' })),
+    ...t.system.map(file => ({ file, status: 'filtered' as const, label: SYSTEM_FILE_LABEL })),
+  ]
+}
+const STATUS_LABEL: Record<RowStatus, string> = { usable: 'Usable', failed: 'Failed', filtered: 'Filtered out' }
+const STATUS_ICON: Record<RowStatus, string> = { usable: 'check', failed: 'alert', filtered: 'minus' }
+const countBy = (rows: SelRow[]) => ({ usable: rows.filter(r => r.status === 'usable').length, failed: rows.filter(r => r.status === 'failed').length, filtered: rows.filter(r => r.status === 'filtered').length })
+export const selectionSummary = (rows: SelRow[]) => { const n = countBy(rows); return `${plural(rows.length, 'file')}: ${n.usable} usable, ${n.failed} failed, ${n.filtered} filtered out` }
+
+/** Every picked file with its status and reason, filterable by status and name. Only usable files can be chosen. */
+function SelectionList({ rows }: { rows: SelRow[] }) {
+  const [status, setStatus] = useState<RowStatus | 'all'>('all')
+  const [q, setQ] = useState('')
+  const n = countBy(rows)
+  const query = q.trim().toLowerCase()
+  const shown = rows.filter(r => (status === 'all' || r.status === status) && (!query || r.file.name.toLowerCase().includes(query)))
+  return (
+    <section className="sel-list-wrap" aria-label="All selected files">
+      <div className="fit-grid-bar">
+        <strong className="sel-summary" role="status">{selectionSummary(rows)}</strong>
+        <span className="sel-controls">
+          <select className="fit-search sel-status" value={status} onChange={e => setStatus(e.target.value as RowStatus | 'all')} aria-label="Filter files by status">
+            <option value="all">All ({rows.length})</option>
+            <option value="usable">Usable ({n.usable})</option>
+            <option value="failed">Failed ({n.failed})</option>
+            <option value="filtered">Filtered out ({n.filtered})</option>
+          </select>
+          <input type="search" className="fit-search" value={q} onChange={e => setQ(e.target.value)} placeholder="Filter by file name" aria-label="Filter all selected files by name" />
+        </span>
+      </div>
+      {shown.length
+        ? <ul className="sel-list">
+          {shown.map((r, i) => <li key={`${r.file.name}|${r.file.size}|${i}`} className={`sel-row is-${r.status}`}>
+            <span className="sel-name" title={r.file.webkitRelativePath || r.file.name}>{r.file.name}</span>
+            <span className="muted xs">{fmtBytes(r.file.size)}</span>
+            <span className={`sel-badge is-${r.status}`}><Icon name={STATUS_ICON[r.status]} size={11} />{r.label ?? <>{STATUS_LABEL[r.status]}{r.reason && <span className="sel-reason"> · {r.reason}</span>}</>}</span>
+          </li>)}
+        </ul>
+        : <p className="muted sm fit-empty" role="status">No files match</p>}
+      {n.failed > 0 && <p className="muted xs sel-hint">Failed files are never uploaded. Convert documents you need to {TYPES_LABEL} (for example, save as PDF) and pick them again.</p>}
+    </section>
+  )
+}
 
 /** Staged review: what was filtered out, what is usable, and a choice that must fit the batch before Upload turns on. */
 function ReviewDialog({ review, existing, onClose, onUpload }: { review?: Review; existing: Existing; onClose: () => void; onUpload: (files: File[]) => void }) {
   const t = review?.t
-  const [chosen, setChosen] = useState<Set<File>>(new Set())
-  const [shown, setShown] = useState<Review>()
-  if (review !== shown) { // new selection: preselect everything if it all fits, otherwise let the user choose
-    setShown(review)
-    setChosen(new Set(t && fit(t.usable, existing).ok ? t.usable : []))
-  }
+  const theme = useUi(s => s.theme)
+  const inReview = useUppyState(reviewUppy, s => s.files)
+  // New selection: preselect everything if it fits single or multi-batch.
+  useEffect(() => { if (t) setReviewFiles(fit(t.usable, existing, { allowMultiBatch: true }).ok ? t.usable : []) }, [review])
   if (!t || !review) return <Dialog open={false} title="" onClose={onClose} footer={null}>{null}</Dialog>
-  const picked = t.usable.filter(f => chosen.has(f))
-  const f = fit(picked, existing)
-  const excluded = t.total - t.usable.length
-  const toggle = (file: File) => setChosen(s => { const n = new Set(s); if (n.has(file)) n.delete(file); else n.add(file); return n })
-  const pctFiles = Math.min(100, (f.count / Math.max(f.roomFiles, 1)) * 100), pctBytes = Math.min(100, (f.bytes / Math.max(f.roomBytes, 1)) * 100)
+  const picked = Object.values(inReview).map(x => x.data as File)
+  const f = fit(picked, existing, { allowMultiBatch: true })
+  const rows = selectionRows(review), n = countBy(rows)
+  const maxRoomFiles = f.multiBatch ? MAX_MULTI_BATCH_FILES : Math.max(f.roomFiles, 1)
+  const maxRoomBytes = f.multiBatch ? MAX_MULTI_BATCH_BYTES : Math.max(f.roomBytes, 1)
+  const pctFiles = Math.min(100, (f.count / maxRoomFiles) * 100), pctBytes = Math.min(100, (f.bytes / maxRoomBytes) * 100)
   const over = (n: number, room: number) => (n > room ? 'over' : n ? 'ok' : '')
   return (
     <Dialog open title="Review your selection" onClose={onClose} className="dialog wide review"
       footer={<>
-        <span className={`review-reason ${f.ok ? 'tone-ok' : ''}`}><Icon name={f.ok ? 'check' : 'lock'} size={12} />{f.ok ? 'Fits the batch. Ready to upload.' : f.reason}</span>
-        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-        <button className={`btn ${f.ok ? 'btn-ok' : 'btn-primary'}`} disabled={!f.ok} onClick={() => onUpload(picked)}>
-          <Icon name="upload" />Upload {f.count || ''} file{f.count === 1 ? '' : 's'}{f.count ? ` · ${fmtBytes(f.bytes)}` : ''}
+        <span className={`review-reason ${f.ok ? 'tone-ok' : ''}`}>
+          <Icon name={f.ok ? 'check' : 'lock'} size={12} />
+          {f.ok
+            ? (f.multiBatch ? 'Ready to upload.' : 'Fits the batch. Ready to upload.')
+            : f.reason}
+        </span>
+        <button className="btn btn-secondary" onClick={() => { reviewUppy.clear(); onClose() }}>Cancel</button>
+        <button className={`btn ${f.ok ? 'btn-ok' : 'btn-primary'}`} disabled={!f.ok} onClick={() => { const files = picked; reviewUppy.clear(); onUpload(files) }}>
+          <Icon name="upload" />
+          {f.count ? `Upload ${plural(f.count, 'file')}` : 'Upload'}
         </button>
       </>}>
       <ol className="funnel" aria-label="Selection funnel">
         <li><span className="funnel-n">{t.total.toLocaleString()}</span><span className="funnel-l">selected</span></li>
-        <li className={t.usable.length ? 'is-ok' : 'is-err'}><span className="funnel-n">{t.usable.length.toLocaleString()}</span><span className="funnel-l">compatible</span>{excluded > 0 && <span className="funnel-sub">{excluded.toLocaleString()} filtered out</span>}</li>
-        <li className={f.ok ? 'is-ok' : f.count ? 'is-err' : ''}><span className="funnel-n">{f.count}</span><span className="funnel-l">chosen for this batch</span></li>
+        <li className={t.usable.length ? 'is-ok' : 'is-err'}><span className="funnel-n">{t.usable.length.toLocaleString()}</span><span className="funnel-l">usable</span>{n.failed + n.filtered > 0 && <span className="funnel-sub">{[n.failed && `${n.failed.toLocaleString()} failed`, n.filtered && `${n.filtered.toLocaleString()} filtered out`].filter(Boolean).join(' · ')}</span>}</li>
+        <li className={f.ok ? 'is-ok' : f.count ? 'is-err' : ''}><span className="funnel-n">{f.count}</span><span className="funnel-l">{f.multiBatch ? 'chosen' : 'chosen for this batch'}</span></li>
       </ol>
+      {f.multiBatch && (
+        <div className="multi-batch-card" style={{ margin: '8px 0 12px 0' }}>
+          <p className="sm" style={{ margin: '4px 0 0 0', color: 'var(--text-sub)' }}>
+            You chose <strong>{plural(f.count, 'file')}</strong> ({fmtBytes(f.bytes)}). One batch holds up to {MAX_BATCH_FILES} files, so they upload in <strong>{plural(f.batchCount ?? 1, 'batch', 'batches')}</strong>, one after another. Each file is checked as it arrives.
+          </p>
+        </div>
+      )}
       <p className="review-lead">
-        {t.usable.length === 0 ? <>None of the {t.total.toLocaleString()} file{t.total === 1 ? '' : 's'} can be uploaded. Accepted types: {TYPES_LABEL}.</>
-          : <>Out of <strong>{t.total.toLocaleString()}</strong> file{t.total === 1 ? '' : 's'}, <strong>{t.usable.length.toLocaleString()}</strong> {t.usable.length === 1 ? 'is' : 'are'} usable.{' '}
-            {fit(t.usable, existing).ok ? 'All of them fit this batch.' : `Choose the important ones: up to ${Math.max(f.roomFiles, 0)} files and ${MB(Math.max(f.roomBytes, 0))}.`}</>}
+        {n.usable === 0 ? <>None of the {plural(rows.length, 'file')} can be uploaded. Accepted types: {TYPES_LABEL}.</>
+          : <>Out of <strong>{plural(rows.length, 'file')}</strong>, <strong>{n.usable.toLocaleString()}</strong> {n.usable === 1 ? 'is' : 'are'} usable.{' '}
+            {fit(t.usable, existing, { allowMultiBatch: true }).ok
+              ? (f.multiBatch ? 'All of them can be uploaded.' : 'All of them fit this batch.')
+              : `Choose the important ones: up to ${plural(Math.max(f.roomFiles, 0), 'file')} and ${MB(Math.max(f.roomBytes, 0))}.`}</>}
       </p>
       {t.usable.length > 0 && <>
         <div className="meters">
-          <div className={`meter ${over(f.count, f.roomFiles)}`}><span className="meter-l">Files</span><span className="meter-bar"><span style={{ width: `${pctFiles}%` }} /></span><span className="meter-n">{f.count} / {Math.max(f.roomFiles, 0)}</span></div>
-          <div className={`meter ${over(f.bytes, f.roomBytes)}`}><span className="meter-l">Size</span><span className="meter-bar"><span style={{ width: `${pctBytes}%` }} /></span><span className="meter-n">{fmtBytes(f.bytes)} / {MB(Math.max(f.roomBytes, 0))}</span></div>
+          <div className={`meter ${over(f.count, maxRoomFiles)}`}>
+            <span className="meter-l">Files</span>
+            <span className="meter-bar"><span style={{ width: `${pctFiles}%` }} /></span>
+            <span className="meter-n">{f.count} / {f.multiBatch ? `${MAX_MULTI_BATCH_FILES} (up to 9 batches)` : Math.max(f.roomFiles, 0)}</span>
+          </div>
+          <div className={`meter ${over(f.bytes, maxRoomBytes)}`}>
+            <span className="meter-l">Size</span>
+            <span className="meter-bar"><span style={{ width: `${pctBytes}%` }} /></span>
+            <span className="meter-n">{fmtBytes(f.bytes)} / {f.multiBatch ? `${fmtBytes(MAX_MULTI_BATCH_BYTES)} (up to 9 batches)` : MB(Math.max(f.roomBytes, 0))}</span>
+          </div>
         </div>
         <div className="tile-panel">
           <div className="tile-bar">
-            <button className="link sm" onClick={() => setChosen(new Set())}>Clear</button>
-            <strong className="tile-bar-title">{f.count} of {t.usable.length.toLocaleString()} file{t.usable.length === 1 ? '' : 's'} selected</strong>
+            <button className="link sm" onClick={() => setReviewFiles([])}>Clear</button>
+            <strong className="tile-bar-title">{f.count} of {plural(Math.max(f.count, t.usable.length), 'file')} selected</strong>
             <span className="row">
-              <button className="link sm" onClick={() => setChosen(new Set(t.usable))}>Select all</button>
-              <button className="link sm" onClick={() => setChosen(new Set(autoPick(t.usable, existing)))}><Icon name="bolt" size={12} />Auto-select what fits</button>
+              <button className="link sm" onClick={() => setReviewFiles(t.usable)}>Select all</button>
+              <button className="link sm" onClick={() => setReviewFiles(autoPick(t.usable, existing))}><Icon name="bolt" size={12} />Auto-select what fits</button>
             </span>
           </div>
-          <ul className="tile-grid" style={{ '--tile': `${tileSize(Math.min(t.usable.length, LIST_CAP))}px` } as React.CSSProperties}>
-            {t.usable.slice(0, LIST_CAP).map(file => {
-              const parts = chunkNames(file.name, file.size)
-              const on = chosen.has(file)
-              const ft = fileType(file.name)
-              return (
-                <li key={`${file.webkitRelativePath || file.name}-${file.size}-${file.lastModified}`} className={`tile ${on ? 'on' : ''}`}>
-                  <label title={`${file.webkitRelativePath || file.name}${parts.length ? `\nSent as ${parts.length} chunks:\n${parts.join('\n')}` : ''}`}>
-                    <input type="checkbox" className="sr-only" checked={on} onChange={() => toggle(file)} />
-                    <span className="tile-preview" style={{ '--ft': ft.color } as React.CSSProperties}>
-                      <span className="tile-doc"><span className="tile-ext">{ft.label}</span></span>
-                      <span className="tile-check" aria-hidden="true">{on && <Icon name="check" size={11} />}</span>
-                      {parts.length > 0 && <span className="tile-chunks">{parts.length} chunks</span>}
-                    </span>
-                    <span className="tile-name">{file.name}</span>
-                    <span className="tile-size">{fmtBytes(file.size)}</span>
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
-          {t.usable.length > LIST_CAP && <p className="muted xs tile-more">Showing {LIST_CAP} of {t.usable.length.toLocaleString()} usable files. Use Auto-select, or pick a smaller folder.</p>}
+          {picked.length
+            ? <FitGrid files={inReview} />
+            : <Dashboard uppy={reviewUppy} className="bam-uppy" width="100%" height={340} theme={theme} hideUploadButton disableStatusBar
+              hideProgressDetails proudlyDisplayPoweredByUppy={false} showSelectedFiles fileManagerSelectionType="both"
+              note={`${TYPES_LABEL} · remove a file to leave it out of this batch`} />}
+          {t.usable.length > LIST_CAP && <p className="muted xs tile-more">Select all takes the first {LIST_CAP} of {t.usable.length.toLocaleString()} usable files. Use Auto-select, or pick a smaller folder.</p>}
         </div>
         {t.usable.some(x => x.size > CHUNK_BYTES) && <details className="excluded chunk-branches">
-          <summary><Icon name="upload" size={12} /> Chunk branches: files over {MB(CHUNK_BYTES)} are sent in {MB(CHUNK_BYTES)} parts</summary>
+          <summary><Icon name="upload" size={12} /> Large files upload in parts</summary>
           {t.usable.filter(x => x.size > CHUNK_BYTES).slice(0, 20).map(file => {
             const parts = chunkNames(file.name, file.size)
             return <div key={`${file.name}-${file.size}`} className="branch-file">
               <span className="branch-root"><Icon name="file" size={12} />{file.name}<span className="muted">{fmtBytes(file.size)}</span></span>
-              <ul className="branch" aria-label={`${file.name} chunks`}>
+              <ul className="branch" aria-label={`${file.name} parts`}>
                 {(parts.length > 4 ? [0, 1, 2, -1, parts.length - 1] : parts.map((_, i) => i)).map(i =>
                   <li key={i}>{i < 0 ? <span className="muted">… {parts.length - 4} more</span>
-                    : <><span className="mono">{parts[i]}</span><span className="muted">{fmtBytes(Math.min(CHUNK_BYTES, file.size - i * CHUNK_BYTES))}</span></>}</li>)}
+                    : <><span>Part {i + 1}</span><span className="muted">{fmtBytes(Math.min(CHUNK_BYTES, file.size - i * CHUNK_BYTES))}</span></>}</li>)}
               </ul>
             </div>
           })}
         </details>}
       </>}
-      {excluded > 0 && <details className="excluded">
-        <summary><Icon name="minus" size={12} /> Filtered out: {excluded.toLocaleString()} file{excluded === 1 ? '' : 's'} (never uploaded)</summary>
-        {t.byExt.length > 0 && <p><strong>{t.unsupported.length.toLocaleString()} unsupported type{t.unsupported.length === 1 ? '' : 's'}</strong> <span className="ext-chips">{t.byExt.slice(0, 12).map(([e, n]) => <span key={e} className="tag">{e} · {n.toLocaleString()}</span>)}{t.byExt.length > 12 && <span className="muted xs">+{t.byExt.length - 12} more types</span>}</span></p>}
-        {t.empty.length > 0 && <p><strong>{t.empty.length} empty</strong> <span className="muted">{t.empty.slice(0, 5).map(x => x.name).join(', ')}{t.empty.length > 5 ? '…' : ''}</span></p>}
-        {t.tooLarge.length > 0 && <p><strong>{t.tooLarge.length} over {MB(MAX_UPLOAD_BYTES)}</strong> <span className="muted">{t.tooLarge.slice(0, 5).map(x => `${x.name} (${fmtBytes(x.size)})`).join(', ')}. Split or compress them.</span></p>}
-        {t.system.length > 0 && <p><strong>{t.system.length} system files</strong> <span className="muted">(.DS_Store, Thumbs.db, ~$ temp files)</span></p>}
-        <p className="muted xs">Convert documents you need to {TYPES_LABEL} (for example, save as PDF) and pick them again.</p>
-      </details>}
+      <SelectionList rows={rows} />
     </Dialog>
   )
 }
 
-function UploadZone({ closed, onPick, onBulk }: { closed?: string; onPick: (l: FileList, s: Source) => void; onBulk: () => void }) {
-  const [over, setOver] = useState(false)
-  return (
-    <div className={`dropzone scan-drop ${over ? 'over' : ''} ${closed ? 'is-disabled' : ''}`}
-      onDragOver={e => { if (closed) return; e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
-      onDrop={e => { e.preventDefault(); setOver(false); if (!closed) onPick(e.dataTransfer.files, 'drop') }}>
-      <span className="scan-drop-icon"><Icon name="upload" size={20} /></span>
-      <div className="scan-drop-text">
-        <strong>Drag and drop files here</strong>
-        <span>or browse to upload discovery documents</span>
-        <span className="faint xs">{TYPES_LABEL} · up to {MAX_BATCH_FILES} files / {MB(MAX_BATCH_BYTES)} per batch · files over {MB(CHUNK_BYTES)} upload in {MB(CHUNK_BYTES)} chunks</span>
-        {closed && <span className="gate-reason"><Icon name="lock" size={12} />{closed}</span>}
-      </div>
-      <div className="scan-drop-actions">
-        <Picker source="files" onPick={onPick} disabled={!!closed} className="btn btn-primary"><Icon name="upload" />Browse files</Picker>
-        <button className="btn btn-secondary" disabled={!!closed} onClick={onBulk}>Bulk upload<Icon name="chevron" size={12} /></button>
-      </div>
-    </div>
-  )
-}
+const FLOW_STAGES = [
+  { step: 1, label: 'Upload', icon: 'upload', desc: 'Flow 1/6: Streaming discovery files to air-gapped quarantine perimeter' },
+  { step: 2, label: 'Quarantine', icon: 'lock', desc: 'Flow 2/6: Air-gapped quarantine staging & SHA-256 fingerprinting' },
+  { step: 3, label: `${AV_NAME} (ClamAV)`, icon: 'shield', desc: 'Flow 3/6: ClamAV static MD5/SHA256 signature scan & macro AST inspection' },
+  { step: 4, label: `${REPEL_NAME}`, icon: 'shield', desc: 'Flow 4/6: Repel behavioral payload repulsion & prompt injection defense' },
+  { step: 5, label: 'Twin Verdict', icon: 'check', desc: 'Flow 5/6: Unanimous fail-closed consensus evaluation' },
+  { step: 6, label: 'Released', icon: 'bolt', desc: 'Flow 6/6: Twin-engine certified files admitted to BAM RAG pipeline' },
+]
 
 /** Live security pipeline for the batch: upload, quarantine, BuLL*Sav scan, verdict, release. Every count comes from real state. */
 function AvStatus({ uploads }: { uploads: UploadRecord[] }) {
@@ -225,32 +281,107 @@ function AvStatus({ uploads }: { uploads: UploadRecord[] }) {
   const released = uploads.filter(u => u.released).length
   const state = sending.length || pending.length ? 'scanning' : !total ? 'idle' : blocked ? 'threat' : errors ? 'error' : 'clear'
   const s = (n: number) => (n === 1 ? '' : 's')
-  const [title, sub] = {
-    idle: [`${AV_NAME} ready`, 'Every upload is quarantined and virus-scanned before it can enter the pipeline.'],
-    scanning: sending.length && !pending.length
-      ? [`Uploading ${sending.length} file${s(sending.length)} to quarantine · ${sendPct}%`, chunked.length ? `${chunked.length} large file${s(chunked.length)} sent in ${MB(CHUNK_BYTES)} chunks, 3 files at a time. Each file is scanned as soon as it lands.` : 'Up to 3 files at a time. Each file is scanned as soon as it lands in quarantine.']
-      : [`Scanning for threats · ${total - pending.length} of ${total} checked`, 'Signature check running. Files stay in quarantine until they pass.'],
-    threat: [`${blocked} threat${s(blocked)} quarantined`, 'Blocked files cannot be opened or ingested. Remove them to continue.'],
-    error: [`${errors} scan${s(errors)} did not finish`, 'No verdict means not clean. Retry the scan or remove the file.'],
-    clear: [`All ${total} file${s(total)} clean`, 'Released to the BAM pipeline. Ready for the ingestion run.'],
-  }[state]
+
+  const [animatingStep, setAnimatingStep] = useState<number | null>(null)
+  const animationTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevUploadsCount = useRef(uploads.length)
+
+  const runSequentialFlow = (targetStep = 1) => {
+    if (animationTimer.current) clearTimeout(animationTimer.current)
+    if (targetStep <= 6) {
+      setAnimatingStep(targetStep)
+      animationTimer.current = setTimeout(() => {
+        runSequentialFlow(targetStep + 1)
+      }, targetStep === 1 ? 650 : targetStep === 2 ? 750 : targetStep === 3 ? 850 : targetStep === 4 ? 800 : targetStep === 5 ? 700 : 800)
+    } else {
+      setAnimatingStep(null)
+    }
+  }
+
+  // Auto-trigger sequential animation when batch is loaded or uploads start
+  useEffect(() => {
+    if (uploads.length > 0 && prevUploadsCount.current === 0) {
+      runSequentialFlow(1)
+    }
+    prevUploadsCount.current = uploads.length
+    return () => {
+      if (animationTimer.current) clearTimeout(animationTimer.current)
+    }
+  }, [uploads.length])
+
+  // Expose runSequentialFlow globally for external triggers
+  useEffect(() => {
+    ;(window as any).__triggerAvFlow = () => runSequentialFlow(1)
+    return () => { delete (window as any).__triggerAvFlow }
+  }, [])
+
+  const isSimulating = animatingStep !== null
+  const currentStepInfo = isSimulating ? FLOW_STAGES[animatingStep - 1] : null
+
+  const [title, sub] = isSimulating
+    ? [
+        `Flow ${animatingStep}/6 Running: ${currentStepInfo?.label}`,
+        currentStepInfo?.desc ?? '',
+      ]
+    : {
+        idle: [`Dual Engines Ready: ${AV_NAME} & ${REPEL_NAME}`, 'Every upload is quarantined and evaluated by ClamAV and Repel before entering the BAM pipeline.'],
+        scanning: sending.length && !pending.length
+          ? [`Uploading ${sending.length} file${s(sending.length)} to quarantine · ${sendPct}%`, chunked.length ? `${chunked.length} large file${s(chunked.length)} sent in ${MB(CHUNK_BYTES)} chunks, 3 files at a time. Each file is scanned as soon as it lands.` : 'Up to 3 files at a time. Evaluated by ClamAV and Repel as soon as it lands in quarantine.']
+          : [`Twin-Engine Defense Running · ${total - pending.length} of ${total} inspected`, 'ClamAV signature inspection + Repel behavioral evasion check active. Files stay quarantined until both pass.'],
+        threat: [`${blocked} threat${s(blocked)} quarantined by security perimeter`, 'Blocked files cannot be opened or ingested. Remove them to continue.'],
+        error: [`${errors} scan${s(errors)} did not finish`, 'No verdict means not clean. Retry the scan or remove the file.'],
+        clear: [`All ${total} file${s(total)} clean (ClamAV & Repel Verified)`, 'Twin-engine security verified. Released to the BAM pipeline for ingestion.'],
+      }[state]
+
   type St = 'idle' | 'active' | 'done' | 'alert'
   const resolved = total > 0 && !pending.length
-  const nodes: { label: string; st: St; count: string; icon: string }[] = [
-    { label: 'Upload', icon: 'upload', st: sending.length ? 'active' : failed.length ? 'alert' : total ? 'done' : 'idle',
-      count: sending.length ? `${sendPct}%` : failed.length ? `${failed.length} failed` : total ? `${total} sent` : '—' },
-    { label: 'Quarantine', icon: 'lock', st: queued ? 'active' : total ? 'done' : 'idle', count: queued ? `${queued} waiting` : total ? `${total} held` : '—' },
-    { label: `${AV_NAME} scan`, icon: 'shield', st: inScan.length ? 'active' : errors ? 'alert' : resolved ? 'done' : 'idle', count: total ? `${total - pending.length}/${total}` : '—' },
-    { label: 'Verdict', icon: blocked ? 'alert' : 'check', st: blocked || errors ? 'alert' : resolved ? 'done' : clean ? 'active' : 'idle',
-      count: total ? `${clean} clean${blocked ? ` · ${blocked} blocked` : ''}` : '—' },
-    { label: 'Released', icon: 'bolt', st: released && released === total ? 'done' : released ? 'active' : 'idle', count: total ? `${released} of ${total}` : '—' },
-  ]
-  const pct = sending.length && !pending.length ? sendPct : total ? Math.round((total - pending.length) / total * 100) : 0
+
+  const nodes: { label: string; st: St; count: string; icon: string }[] = isSimulating
+    ? FLOW_STAGES.map((fs, idx) => {
+        const stepNum = idx + 1
+        const st: St = stepNum < animatingStep ? 'done' : stepNum === animatingStep ? 'active' : 'idle'
+        const count = stepNum < animatingStep ? 'Passed' : stepNum === animatingStep ? 'Running…' : 'Queued'
+        return { label: fs.label, icon: fs.icon, st, count }
+      })
+    : [
+        { label: 'Upload', icon: 'upload', st: sending.length ? 'active' : failed.length ? 'alert' : total ? 'done' : 'idle',
+          count: sending.length ? `${sendPct}%` : failed.length ? `${failed.length} failed` : total ? `${total} sent` : '—' },
+        { label: 'Quarantine', icon: 'lock', st: queued ? 'active' : total ? 'done' : 'idle', count: queued ? `${queued} waiting` : total ? `${total} held` : '—' },
+        { label: `${AV_NAME} (ClamAV)`, icon: 'shield', st: inScan.length ? 'active' : errors ? 'alert' : resolved ? 'done' : 'idle', count: total ? `${total - pending.length}/${total}` : '—' },
+        { label: `${REPEL_NAME}`, icon: 'shield', st: inScan.length ? 'active' : errors ? 'alert' : resolved ? 'done' : 'idle', count: total ? `${total - pending.length}/${total}` : '—' },
+        { label: 'Twin Verdict', icon: blocked ? 'alert' : 'check', st: blocked || errors ? 'alert' : resolved ? 'done' : clean ? 'active' : 'idle',
+          count: total ? `${clean} clean${blocked ? ` · ${blocked} blocked` : ''}` : '—' },
+        { label: 'Released', icon: 'bolt', st: released && released === total ? 'done' : released ? 'active' : 'idle', count: total ? `${released} of ${total}` : '—' },
+      ]
+
+  const pct = isSimulating
+    ? Math.round((animatingStep / 6) * 100)
+    : sending.length && !pending.length
+    ? sendPct
+    : total
+    ? Math.round(((total - pending.length) / total) * 100)
+    : 0
+
   return (
-    <section id="av-status" className={`av av-${state}`} aria-label="Virus scan status">
+    <section id="av-status" className={`av av-${isSimulating ? 'scanning' : state}`} aria-label="Virus scan status">
       <div className="av-head" role="status" aria-live="polite">
-        <span className="av-radar" aria-hidden="true"><Icon name={state === 'threat' ? 'alert' : 'shield'} size={16} /></span>
-        <span className="av-text"><strong>{title}</strong><span>{sub}</span></span>
+        <span className="av-radar" aria-hidden="true"><Icon name={isSimulating ? 'spinner' : state === 'threat' ? 'alert' : 'shield'} size={16} spin={isSimulating} /></span>
+        <span className="av-text">
+          <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <strong>{title}</strong>
+            <button
+              type="button"
+              className="btn btn-secondary sm"
+              style={{ fontSize: '11px', padding: '2px 8px', height: '24px' }}
+              onClick={() => runSequentialFlow(1)}
+              title="Re-run animated 6-flow defense progression"
+            >
+              <Icon name="refresh" size={10} spin={isSimulating} />
+              <span>{isSimulating ? `Flow ${animatingStep}/6…` : 'Animate Defense Flow'}</span>
+            </button>
+          </div>
+          <span>{sub}</span>
+        </span>
       </div>
       <ol className="av-flow">
         {nodes.map(n => (
@@ -261,74 +392,18 @@ function AvStatus({ uploads }: { uploads: UploadRecord[] }) {
           </li>
         ))}
       </ol>
-      {(total > 0 || sending.length > 0) && <span className="av-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>}
+      {(total > 0 || sending.length > 0 || isSimulating) && (
+        <span className="av-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
+      )}
       {chunked.length > 0 && <p className="av-now xs"><Icon name="upload" size={11} /> Chunked upload:
         {chunked.slice(0, 3).map(f => { const n = chunkCount(f.size ?? 0); const done = Math.min(n, Math.floor((f.progress.bytesUploaded || 0) / CHUNK_BYTES)); return <span key={f.id} className="mono">part {Math.min(n, done + 1)}/{n} · {f.name}</span> })}</p>}
-      {inScan.length > 0 && <p className="av-now xs"><Icon name="eye" size={11} /> Now scanning:
+      {inScan.length > 0 && !isSimulating && <p className="av-now xs"><Icon name="eye" size={11} /> Now scanning:
         {inScan.slice(0, 3).map(u => <span key={u.id} className="mono">{u.name}</span>)}{queued > 0 && <span className="muted">+{queued} waiting in quarantine</span>}</p>}
       {failed.length > 0 && <div className="av-failed">
         <span className="stage-error"><Icon name="alert" size={12} /> {failed.length} upload{s(failed.length)} failed and never reached quarantine: {failed.slice(0, 3).map(f => f.name).join(', ')}{failed.length > 3 ? ` and ${failed.length - 3} more` : ''}.</span>
         <span className="row"><button className="btn btn-secondary sm" onClick={() => void uppy.retryAll()}><Icon name="refresh" />Retry</button>
           <button className="btn btn-ghost sm" onClick={() => uppy.removeFiles(failed.map(f => f.id))}>Dismiss</button></span>
       </div>}
-    </section>
-  )
-}
-
-function FilesTable({ uploads, editable }: { uploads: UploadRecord[]; editable: boolean }) {
-  const [filter, setFilter] = useState<Filter>('all')
-  const { busy, run } = useAction()
-  const n = (s: Filter) => uploads.filter(u => u.scan === s).length
-  // Filtering is display only: eligibility always uses the full batch.
-  const shown = filter === 'all' ? uploads : uploads.filter(u => u.scan === filter)
-  const view = (u: UploadRecord) => run('View file', async () => {
-    await api.getVerifiedFileAccess(u.id)
-    setUi({ fileDetail: u.id }); goScreen('1.3')
-  }, { step: 1 })
-  return (
-    <section className="scan-files" aria-labelledby="files-title">
-      <header className="scan-files-head">
-        <h3 id="files-title">Uploaded files <span className="muted xs">{uploads.length} file{uploads.length === 1 ? '' : 's'}</span></h3>
-        <span className="scan-counts xs">
-          <span className="muted">{n('scanning')} scanning</span><span className="tone-ok">{n('verified')} verified</span><span className="tone-err">{n('blocked')} blocked</span>
-        </span>
-        <label className="sr-only" htmlFor="scan-filter">Filter by scan status</label>
-        <select id="scan-filter" className="select" value={filter} onChange={e => setFilter(e.target.value as Filter)}>
-          <option value="all">All statuses</option><option value="verified">Verified</option><option value="scanning">Scanning</option><option value="blocked">Blocked</option>
-        </select>
-      </header>
-      {!uploads.length ? <Empty icon="upload" title="No files uploaded yet">Uploaded files are scanned automatically. Clean files are released to the BAM pipeline.</Empty>
-        : !shown.length ? <Empty icon="file" title="No files with this status">Choose another filter. Hidden files still count toward the ingestion gate.</Empty>
-        : <div className="scroll-box">
-          <table className="table scan-table">
-            <thead><tr><th scope="col">File name</th><th scope="col">Size</th><th scope="col">Uploaded time</th><th scope="col">Scan status</th><th scope="col" className="ta-r">Actions</th></tr></thead>
-            <tbody>{shown.map(u => {
-              const v = scanView(u)
-              const can = (a: ScanAction) => editable && v.actions.includes(a)
-              return (
-                <tr key={u.id} className={u.scan === 'blocked' ? 'row-fail' : u.scan === 'scanning' && !u.scanError ? 'row-scanning' : ''}>
-                  <th scope="row"><span className="scan-file"><Icon name="file" />
-                    <span className="file-main"><span className="file-name">{u.name}</span><span className="mono xs faint scan-path" title={u.objectKey}>{u.objectKey}</span></span></span></th>
-                  <td>{fmtBytes(u.size)}{u.parts > 1 && <div className="muted xs">{u.parts} × {MB(CHUNK_BYTES)} chunks</div>}</td>
-                  <td><Time iso={u.uploadedAt} /></td>
-                  <td><StatusPill status={v.pill} text={v.label} /><div className={`xs ${u.scan === 'blocked' ? 'tone-err' : 'muted'} scan-note`}>{v.text}</div>
-                    {u.scan === 'scanning' && !u.scanError && <span className="av-laser" aria-hidden="true" />}</td>
-                  <td className="ta-r"><span className="scan-actions">
-                    {v.actions.includes('view') && <button className="link sm" disabled={!!busy} onClick={() => void view(u)}>View file</button>}
-                    {can('retry') && <button className="btn btn-secondary sm" disabled={!!busy} onClick={() => run('Retry scan', () => api.retryScan(u.id), { step: 1 })}><Icon name="refresh" />Retry scan</button>}
-                    {can('remove') && (u.scan === 'blocked'
-                      ? <button className="btn btn-danger sm" disabled={!!busy} onClick={() => run('Remove file', () => api.removeUpload(u.id), { step: 1, success: `${u.name} removed from the batch. The object stays in quarantine.` })}>Remove</button>
-                      : <button className="icon-btn sm" disabled={!!busy} aria-label={`Remove ${u.name}`} title="Remove from batch" onClick={() => run('Remove file', () => api.removeUpload(u.id), { step: 1 })}><Icon name="x" size={12} /></button>)}
-                    {!v.actions.length && <span className="faint xs">Unavailable</span>}
-                  </span></td>
-                </tr>
-              )
-            })}</tbody>
-          </table>
-        </div>}
-      <footer className="rag-card-foot">
-        <span>{uploads.length} files · {n('verified')} verified · {n('scanning')} scanning · {n('blocked')} blocked</span>
-      </footer>
     </section>
   )
 }
@@ -368,121 +443,131 @@ function scanRow(snap: Snapshot) {
   const u = snap.uploads
   const scanning = u.filter(x => x.scan === 'scanning' && !x.scanError).length
   const errors = u.filter(x => x.scanError).length
-  const blocked = u.filter(x => x.scan === 'blocked').length
+  const blocked = u.filter(x => x.scan === 'blocked' || x.clamavVerdict === 'threat' || x.repelVerdict === 'threat').length
   const st = !u.length ? { cls: 'q', icon: 'circle', text: 'Queued', detail: 'waiting for uploads' }
     : scanning ? { cls: 'r', icon: 'spinner', text: 'Running', detail: `${scanning} scanning` }
     : errors ? { cls: 'f', icon: 'alert', text: 'Scan error', detail: `${errors} scan error${errors === 1 ? '' : 's'}` }
     : blocked ? { cls: 'f', icon: 'x', text: 'Blocked', detail: `${blocked} blocked` }
-    : { cls: 'd', icon: 'check', text: 'Done', detail: `${u.length} clean` }
+    : { cls: 'd', icon: 'check', text: 'Done', detail: `${u.length} clean (Dual engines)` }
   return (
     <li className={`pipe-step ps-${st.cls}`}>
       <span className="pipe-icon"><Icon name={st.icon} size={13} spin={st.cls === 'r'} /><span className="sr-only">{st.text}</span></span>
-      <span className="pipe-label">Virus scan ({AV_NAME})</span>
+      <span className="pipe-label">Dual Scan ({AV_NAME} + {REPEL_NAME})</span>
       <span className="pipe-detail">{st.detail}</span>
     </li>
   )
 }
 
-/** 1.1 Intake console: upload & virus scan. */
-export function Intake({ snap, info }: StepProps) {
-  const rag = useRag(s => s)
-  const uploading = useUploadsInFlight()
-  const uploadErrors = useUppyState(uppy, s => Object.values(s.files).filter(f => f.error).length)
+/** Upload (file transfer) and Scan (security check), one component so both screens share state. */
+export function Intake({ snap, info, view }: StepProps & { view: 'upload' | 'scan' }) {
   const { busy, run } = useAction()
-  const startingRef = useRef(false)
   const [outcome, setOutcome] = useState<ScanOutcome>('clean')
-  const closed = info.editable ? undefined : 'Uploads are closed while the SOW is approved. Reopen 3.1 to add documents.'
-  const starting = busy === 'Start ingestion run'
-  const block = closed ? 'Reopen 3.1 to change the intake batch'
-    : uploadErrors ? 'Retry or dismiss failed uploads'
-    : ingestionBlock(snap.uploads, { uploading, starting, running: isRunning(rag), ingestion: snap.ingestion })
+  const closed = info.editable ? undefined : 'Uploads are closed while the SOW is approved. Reopen Scope to add documents.'
+  const [details, setDetails] = useState(false)
 
   // Staged intake: triage the selection; upload straight away only when nothing was filtered and it all fits.
-  const [bulk, setBulk] = useState(false)
+  const uppyFiles = useUppyState(uppy, s => s.files)
   const [review, setReview] = useState<Review>()
-  const sendingFiles = useUppyState(uppy, s => Object.values(s.files).filter(f => !f.progress.uploadComplete && !f.error))
+  const sendingFiles = Object.values(uppyFiles).filter(f => !f.progress.uploadComplete && !f.error)
   const existing = { count: snap.uploads.length + sendingFiles.length, bytes: snap.uploads.reduce((n, u) => n + u.size, 0) + sendingFiles.reduce((n, f) => n + (f.size ?? 0), 0) }
   const send = (files: File[]) => {
     setReview(undefined)
-    uploadFiles(files)
-    const big = files.filter(f => f.size > CHUNK_BYTES).length
-    toast(`${files.length} file${files.length === 1 ? '' : 's'} uploading to quarantine${big ? `, ${big} in ${MB(CHUNK_BYTES)} chunks` : ''}. The virus scan starts as each one lands.`, 'info', '1.1')
-    // Let the dialog fade out, then bring the live scan into view.
-    setTimeout(() => {
-      const el = document.getElementById('av-status')
-      if (!el) return
-      el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
-      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash')
-    }, 220)
+    if (files.length > MAX_BATCH_FILES) {
+      // Smart multi-batch waves: one batch per MAX_BATCH_FILES files.
+      const batchCount = Math.ceil(files.length / MAX_BATCH_FILES)
+      for (let i = 0; i < batchCount; i++) uploadFiles(files.slice(i * MAX_BATCH_FILES, (i + 1) * MAX_BATCH_FILES), `batch-${i + 1}`)
+    } else uploadFiles(files)
   }
   const take = (list: FileList, source: Source) => {
-    setBulk(false)
-    const tr = triage(list)
-    const filtered = tr.unsupported.length + tr.empty.length + tr.tooLarge.length
-    if (filtered) setUi(s => ({ rejected: [...s.rejected, { name: `${list.length.toLocaleString()} picked (${source})`, reason: `${filtered.toLocaleString()} filtered out: ${tr.unsupported.length} unsupported, ${tr.empty.length} empty, ${tr.tooLarge.length} over ${MB(MAX_UPLOAD_BYTES)}`, at: new Date().toISOString() }] }))
-    if (!filtered && tr.usable.length && fit(tr.usable, existing).ok) send(tr.usable)
-    else setReview({ source, t: tr })
+    const all = triage(list)
+    // A file already in this intake (same name and size) is skipped, not uploaded twice.
+    const have = new Set([...snap.uploads.map(u => `${u.name}|${u.size}`), ...Object.values(uppyFiles).map(f => `${f.name}|${f.size}`)])
+    const dupes = all.usable.filter(f => have.has(`${f.name}|${f.size}`))
+    const tr = dupes.length ? { ...all, usable: all.usable.filter(f => !dupes.includes(f)) } : all
+    if (dupes.length) { const at = new Date().toISOString(); setUi(s => ({ rejected: [...s.rejected, ...dupes.map(f => ({ name: f.name, reason: 'Skipped - duplicate', at }))] })) }
+    const filtered = tr.unsupported.length + tr.empty.length + tr.tooLarge.length + tr.system.length
+    if (filtered) {
+      // Each refused file by name with its reason (shown in Upload's Rejected list); a huge pick is summarised after 50.
+      const at = new Date().toISOString()
+      const named = [
+        ...tr.unsupported.map(f => ({ name: f.name, reason: `Unsupported type (${extOf(f.name)})` })),
+        ...tr.empty.map(f => ({ name: f.name, reason: 'Empty file' })),
+        ...tr.tooLarge.map(f => ({ name: f.name, reason: `Over ${MB(MAX_UPLOAD_BYTES)}` })),
+        ...tr.system.map(f => ({ name: f.name, reason: SYSTEM_FILE_LABEL })),
+      ]
+      const shown = named.slice(0, 50).map(r => ({ ...r, at }))
+      if (named.length > 50) shown.push({ name: `${(named.length - 50).toLocaleString()} more files`, reason: 'Filtered out at selection (unsupported, empty, too large or system files)', at })
+      setUi(s => ({ rejected: [...s.rejected, ...shown] }))
+    }
+    // Every source (files, folder, ZIP, bulk, drop) opens the review dialog: nothing uploads without it (per user, 15 Oct 2026).
+    setReview({ source, t: tr, dupes })
   }
-
-  const start = async () => {
-    if (startingRef.current) return // double-click guard; the backend also rejects a repeated start
-    startingRef.current = true
-    const r = await run('Start ingestion run', () => api.startIngestionRun(), { step: 1 })
-    startingRef.current = false
-    if (!r) return false
-    // Hand RAG what BuLL*Sav released: the OKF v0.2 source concepts and the clean object URIs.
-    const okf = buildOkfBundle(snap.uploads, ragPipeline.getState(), new Date().toISOString()).filter(f => f.path.startsWith('sources/'))
-    ragPipeline.start({ input: { files: okf, objects: snap.uploads.filter(u => r.fileIds.includes(u.id)).map(u => u.objectKey) } })
-    return true
-  }
-  // Opens RAG; starts the ingestion run first when the verified batch has not been ingested yet.
-  const ingested = !!snap.ingestion && !!rag.runId
-  const extractContext = async () => { if (ingested || await start()) goScreen('2.1') }
   const demo = demoControls() && api.demo
-
-  return (
-    <main className="intake">
-      <section className="rag-card intake-main" aria-labelledby="center-title">
-        <header>
-          <p className="kicker">Step 1 · Documents</p>
-          <h2 id="center-title" tabIndex={-1}>Upload &amp; virus scan</h2>
-          <p className="muted sm">Upload discovery documents. Clean files are released to the BAM pipeline.</p>
-        </header>
-        <UploadZone closed={closed} onPick={take} onBulk={() => setBulk(true)} />
-        <BulkDialog open={bulk} onClose={() => setBulk(false)} onPick={take} />
-        <ReviewDialog review={review} existing={existing} onClose={() => setReview(undefined)} onUpload={send} />
-        <div className="scan-gate" role="note">
-          <Icon name="shield" />
-          <strong>Files only enter the pipeline after the virus scan passes</strong>
-          {DEMO_RUN && <span className="tag scan-mock" title="No antivirus runs in this build. Verdicts come from the mock scan adapter.">Mock scan service</span>}
-          <span className="faint xs scan-powered" title="Scan engine: ClamAV (clamd)">Powered by <strong className="av-brand">{AV_NAME}</strong> · {AV_VENDOR}</span>
-        </div>
+  // + Add files (left), the left-pane drop and the middle drop zone all arrive here (UploadPanes.tsx).
+  const takeRef = useRef(take)
+  takeRef.current = take
+  useEffect(() => { if (view !== 'upload' || closed) return; setPickHandler((l, src) => takeRef.current(l, src)); return () => setPickHandler(null) }, [view, closed])
+  const docs = snap.uploads.length
+  const failedUploads = Object.values(uppyFiles).filter(f => f.error)
+  const dialogs = <>
+    <ReviewDialog review={review} existing={existing} onClose={() => setReview(undefined)} onUpload={send} />
+  </>
+  const scanDetails = (
+    <SecurityDetails snap={snap}>
+      <section className="dc-sec"><h3><Icon name="scan" size={14} />Scan activity</h3>
         <AvStatus uploads={snap.uploads} />
-        <FilesTable uploads={snap.uploads} editable={info.editable} />
-        <footer className="rag-card-foot">
-          <span>Blocked files are quarantined and cannot be opened or ingested.</span><span>Automatic scan on upload</span>
-        </footer>
-      </section>
-      <div className="intake-side">
-        <PipelineCard title="Hand-off to RAG (stage 2)" lead={scanRow(snap)} controls={
-          <div className="pipe-controls scan-start">
-            <GateButton action="ingest" reason={starting ? undefined : block} busy={starting} successKey={snap.ingestion?.runId} onClick={start}>Start ingestion run</GateButton>
-            {snap.ingestion && <span className="muted xs">Last run <span className="mono">{snap.ingestion.runId}</span> · {snap.ingestion.fileIds.length} verified file{snap.ingestion.fileIds.length === 1 ? '' : 's'} · <Time iso={snap.ingestion.at} /></span>}
-            {demo && <div className="row">
-              <label className="pipe-sim">Simulate scan (mock)
-                <select value={outcome} onChange={e => { const o = e.target.value as ScanOutcome; setOutcome(o); demo.setScanOutcome(o) }}>
-                  <option value="clean">None (clean)</option><option value="threat">Threat detected</option><option value="error">Scanner outage</option>
-                </select>
-              </label>
-              <button className="btn btn-ghost sm" disabled={!!snap.ingestion} onClick={() => { demo.loadScanFixture(); void run('Load fixture', async () => {}) }}>Load mockup batch</button>
-            </div>}
-          </div>} />
-        <section className="rag-card rag-cta">
-          <p className="muted sm">Only virus-scanned, verified documents enter RAG, when the ingestion run starts. The SOW is generated from that context in 3.1.</p>
-          <GateButton variant="secondary" icon="bolt" reason={ingested ? undefined : block} busy={starting} onClick={() => void extractContext()}>Extract context</GateButton>
-        </section>
+        <PipelineCard title="Hand-off to RAG" lead={scanRow(snap)} />
         <ScanActivity events={snap.scanEvents} />
-      </div>
+        {demo && <div className="row">
+          <label className="pipe-sim">Simulate scan outcome
+            <select value={outcome} onChange={e => { const o = e.target.value as ScanOutcome; setOutcome(o); demo.setScanOutcome(o); (window as any).__triggerAvFlow?.() }}>
+              <option value="clean">None (clean)</option><option value="threat">Threat detected</option><option value="error">Scanner outage</option>
+            </select>
+          </label>
+          <button className="btn btn-ghost sm" disabled={!!snap.ingestion} onClick={() => { demo.loadScanFixture(); (window as any).__triggerAvFlow?.(); void run('Load fixture', async () => {}) }}>Load mockup batch</button>
+        </div>}
+      </section>
+    </SecurityDetails>
+  )
+
+  if (view === 'upload') {
+    // FDE view: results only (files on the left, conversation in the middle; UploadPanes.tsx). The scan and quarantine
+    // run inside Upload and still gate everything downstream; their diagnostics appear only with ?demo=1.
+    return <>
+      <UploadResults snap={snap} />
+      {demo && <p className="up-demo"><button className="link xs" onClick={() => setDetails(true)}>Upload diagnostics (demo)</button></p>}
+      {demo && <Dialog open={details} title="Upload diagnostics" onClose={() => setDetails(false)} className="dialog wide dc-details" footer={<button className="btn btn-secondary" onClick={() => setDetails(false)}>Close</button>}>{scanDetails}</Dialog>}
+      {dialogs}
+    </>
+  }
+
+  const scanning = snap.uploads.filter(u => u.scan === 'scanning' && !u.scanError).length
+  const clean = snap.uploads.filter(u => u.scan === 'verified').length
+  const held = snap.uploads.filter(u => u.scan === 'blocked').length
+  const errors = snap.uploads.filter(u => u.scanError)
+  const retryable = errors.length + failedUploads.length
+  const retryAll = () => { if (failedUploads.length) void uppy.retryAll(); for (const u of errors) void run('Retry scan', () => api.retryScan(u.id), { step: 1 }) }
+  const engine = (k: 'clamavVerdict' | 'repelVerdict') => snap.uploads.filter(u => u[k] === 'clean').length
+  const st = !docs ? { i: 'scan', t: 'Nothing to scan yet', pill: '', c: '' }
+    : scanning ? { i: 'spinner', t: 'Scanning', pill: 'In progress', c: 'tone-info' }
+    : held ? { i: 'alert', t: `${held} file${held === 1 ? '' : 's'} held`, pill: 'Held', c: 'tone-err' }
+    : errors.length ? { i: 'alert', t: 'Scan errors', pill: 'Retry', c: 'tone-warn' }
+    : { i: 'shield', t: 'All files clean', pill: 'Passed', c: 'tone-ok' }
+  return (
+    <main className="ing dc" aria-labelledby="center-title">
+      <ScreenTitle title="Scan" help="Dual-engine virus scan per file" details={scanDetails} detailsOpen={details} setDetailsOpen={setDetails}>
+        {retryable > 0 && <button className="btn btn-outline" disabled={!info.editable || !!busy} onClick={retryAll}><Icon name="refresh" />Retry failed</button>}
+      </ScreenTitle>
+      <section className="dc-status" aria-live="polite">
+        <span className={`dc-status-icon ${st.c}`}><Icon name={st.i} size={18} spin={st.i === 'spinner'} /></span>
+        <div className="dc-status-text">
+          <strong>{st.t}</strong>
+          <span className="muted xs">{docs ? `${clean} clean · ${held} infected · ${scanning} scanning · ClamAV ${engine('clamavVerdict')}/${docs} · Repel ${engine('repelVerdict')}/${docs}` : 'Add documents in Upload; each one is scanned automatically.'}</span>
+        </div>
+        {st.pill && <span className={`dc-pill ${st.c}`}>{st.pill}</span>}
+      </section>
+      {docs > 0 && <ScanTable uploads={snap.uploads} editable={info.editable} />}
+      {docs > 0 && <button className="dc-pointer" onClick={() => setDetails(true)}><Icon name="info" size={13} />Scan activity and security details<Icon name="chevron" size={12} /></button>}
     </main>
   )
 }

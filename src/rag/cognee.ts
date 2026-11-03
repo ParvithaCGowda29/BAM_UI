@@ -19,7 +19,7 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function cogneeRunner(base: string, { dataset = COGNEE_DATASET, pollMs = 2000, maxPolls = 900 } = {}): RagRunner {
   return async (from, _runId, io) => {
-    const fail = (key: RagStepKey, e: unknown) => io.setStep(key, { status: 'failed', at: now(), error: `Cognee: ${(e as Error).message}` })
+    const fail = (key: RagStepKey, e: unknown) => io.setStep(key, { status: 'failed', at: now(), error: `Context Engine: ${(e as Error).message}` })
     const order: RagStepKey[] = ['chunk', 'extract', 'graph', 'schemas']
     const runs = (k: RagStepKey) => order.indexOf(k) >= order.indexOf(from)
     let datasetId = io.get().datasetId

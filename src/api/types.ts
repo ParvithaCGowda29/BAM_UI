@@ -52,6 +52,16 @@ export interface UploadRecord {
   scanError?: string
   /** True only after a clean verdict released the object to the clean RAG input location. */
   released: boolean
+  /** Tier-1 ClamAV static signature scan verdict. */
+  clamavVerdict?: 'clean' | 'threat' | 'pending'
+  /** Tier-2 Repel heuristic & adversarial prompt injection verdict. */
+  repelVerdict?: 'clean' | 'threat' | 'pending'
+  /** Detailed Repel evasion score and heuristic telemetry. */
+  repelDetails?: {
+    adversarialEvasionScore: number
+    promptInjectionRisk: 'none' | 'low' | 'high'
+    heuristicFlags: string[]
+  }
 }
 
 export interface ScanEvent {
@@ -283,9 +293,13 @@ export const AUTOMATIONS = [
   'EXCEL_TO_JSON_AST',
   'JSON_TO_PYTHON_JINJA2',
   'HITL_APPROVAL',
+  'CAD_STEP_TOLERANCE_EXTRACTOR',
+  'PCBA_COSTING_ENGINE',
+  'ISATVON_LOOPY_ROUTER',
+  'DYNAMIC_CONTEXT_VERIFIER',
 ] as const
 
-export const ACCEPTED_TYPES = ['.pdf', '.docx', '.xlsx', '.pptx', '.txt', '.zip']
+export const ACCEPTED_TYPES = ['.pdf', '.docx', '.xlsx', '.pptx', '.txt', '.png', '.zip']
 /** One intake batch: at most 25 files and 250 MB in total. A ZIP counts as one file. */
 export const MAX_BATCH_FILES = 25
 export const MAX_BATCH_BYTES = 250 * 1024 * 1024
@@ -297,4 +311,8 @@ export const chunkCount = (size: number) => Math.max(1, Math.ceil(size / CHUNK_B
 
 /** BuLL*Sav = Digibull Security AntiVirus Engine, the 1.1 scan gate. The scan engine behind it is ClamAV (clamd) in production. */
 export const AV_NAME = 'BuLL*Sav'
-export const AV_VENDOR = 'Digibull Security AntiVirus Engine'
+export const AV_VENDOR = 'Digibull Security AntiVirus Engine (ClamAV Core)'
+
+/** Repel = Behavioral Payload & Heuristic Evasion Testing Engine running alongside ClamAV. */
+export const REPEL_NAME = 'Repel Evasion Shield'
+export const REPEL_VENDOR = 'Repel Behavioral Payload & Prompt Defense'

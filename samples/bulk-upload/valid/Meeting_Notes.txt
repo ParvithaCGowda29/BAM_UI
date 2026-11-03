@@ -1,0 +1,4 @@
+Internal review 2026-10-14
+- Bore tolerance achievable on 5-axis cell
+- Quote anodize outside (2 vendors)
+- Open question: does Meridian accept DFARS-compliant alternate 17-4PH source?

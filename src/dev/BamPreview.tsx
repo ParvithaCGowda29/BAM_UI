@@ -6,7 +6,7 @@ import { BAM_ACTIONS, stageMarkers, type BamAction } from '../lib/bamUi.ts'
 import { StageStep } from '../tracker/Tracker'
 import { TASKS, type TrackerStatus } from '../tracker/trackerConfig.ts'
 
-const LABEL: Record<BamAction, string> = { ingest: 'Ingest', generate: 'Generate skills', validate: 'Validate', deploy: 'Deploy', approve: 'Approve SOW', save: 'Save' }
+const LABEL: Record<BamAction, string> = { ingest: 'Ingest', generate: 'Generate skills', validate: 'Validate', deploy: 'Deploy', approve: 'Approve SOW', save: 'Save', review: 'Mark reviewed', commit: 'Commit' }
 const STATES = ['Default', 'Hover', 'Focus', 'Pressed', 'Loading', 'Success'] as const
 const FORCE = `
 .pv .force-hover { transform: translateY(-1.5px); filter: brightness(1.05); box-shadow: inset 0 1px 0 rgba(255,255,255,.65), var(--bam-glow-hi); }

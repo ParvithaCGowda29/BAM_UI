@@ -5,12 +5,12 @@ import { api } from '../api/adapter'
 import { AUTOMATIONS, ISATVON, type IsatvonField, type SkillRow } from '../api/types'
 import type { StepProps } from '../App'
 import { useAction, useSkills } from '../lib/data'
-import { setUi, toast, useUi } from '../lib/store'
+import { setUi, useUi } from '../lib/store'
 import { addCounts, countSegs, diffWords, editCount, type Seg } from '../lib/sowDiff'
 import { goScreen, goStep } from '../lib/route'
-import { ReadonlySow, SowMeta } from '../components/sow'
-import { CertChecklist, ManifestCompare, VersionHistory } from '../components/release'
-import { Banner, Confirm, Empty, ErrorState, GateButton, Icon, Pane, Section, Skeleton, StageList, StatusPill, Time, fmtTime } from '../components/ui'
+import { ReadonlySow } from '../components/sow'
+import { Banner, Confirm, Dialog, Empty, ErrorState, GateButton, Icon, Pane, StatusPill, Time, Tip, fmtTime } from '../components/ui'
+import { tips } from '../lib/actionTips'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
@@ -196,6 +196,8 @@ const shiftEnterInEditor = (p: { editing: boolean; event: KeyboardEvent }) => p.
 // makes AG Grid redraw its rows, which cancels an open cell editor.
 const DEFAULT_COL: ColDef<Row> = { resizable: true, sortable: false, wrapText: true, suppressMovable: true }
 const getRowId = (p: { data: Row }) => p.data.id
+// The cell preview (tooltip) floats over the page, kept inside the viewport, instead of inside the grid's clipped area.
+const POPUP_PARENT = typeof document === 'undefined' ? undefined : document.body
 const isFullWidthRow = (p: { rowNode: { data?: Row } }) => p.rowNode.data?.kind === 'group' || p.rowNode.data?.kind === 'detail'
 const getRowHeight = (p: { data?: Row }) => (p.data?.kind === 'group' ? 40 : p.data?.kind === 'detail' ? 470 : undefined)
 /** Inline editing keeps the existing text: put the cursor at the end instead of selecting (and replacing) everything. */
@@ -205,11 +207,14 @@ const cursorToEnd = () => requestAnimationFrame(() => {
 })
 const FullWidthCell = (p: CustomCellRendererProps<Row, unknown, Ctx>) => (p.data?.kind === 'detail' ? <DetailCell {...p} /> : <GroupCell {...p} />)
 
-function SkillGrid({ rows, setRows, editable, showChanges, onLockedEdit }: { rows: SkillRow[]; setRows: (f: (r: SkillRow[]) => SkillRow[]) => void; editable: boolean; showChanges: boolean; onLockedEdit: () => void }) {
+export function SkillGrid({ rows, setRows, editable, showChanges, onLockedEdit }: { rows: SkillRow[]; setRows: (f: (r: SkillRow[]) => SkillRow[]) => void; editable: boolean; showChanges: boolean; onLockedEdit: () => void }) {
   const [expanded, setExpanded] = useState(new Set<string>())
   const [collapsed, setCollapsed] = useState(new Set<string>())
   const gridApi = useRef<GridApi<Row>>(null)
   const detailDrafts = useRef<Ctx['drafts']>({})
+  // AG Grid's first layout (auto-height cells are measured) leaves its body empty for a moment after it mounts; the
+  // skeleton stays drawn over it until the first rows are painted, so the pane never shows a blank frame.
+  const [painted, setPainted] = useState(false)
   const toggle = (set: Set<string>, id: string) => { const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); return n }
   const context: Ctx = {
     expanded, collapsed, showChanges, editable,
@@ -256,13 +261,15 @@ function SkillGrid({ rows, setRows, editable, showChanges, onLockedEdit }: { row
     })),
   ], [editable])
 
+  // The horizontal scrollbar (moved under the header in CSS) gets its accessible name once the grid has drawn it.
+  const wrap = useRef<HTMLDivElement>(null)
   async function onEdit(id: string, field: IsatvonField, value: string) {
     try {
       const row = await api.updateSkillField(id, field, value)
       setRows(rs => rs.map(r => r.id === id ? row : r))
       return true
     } catch (e) {
-      toast(`Edit not saved: ${(e as Error).message}`, 'error', '3.2')
+      console.error('Edit not saved:', (e as Error).message)
       setRows(rs => [...rs]) // grid edited a copy; rebuilding from rows restores the saved value
       return false
     }
@@ -288,21 +295,50 @@ function SkillGrid({ rows, setRows, editable, showChanges, onLockedEdit }: { row
       {ISATVON.map(c => <button key={c.key} className="col-chip" onClick={() => jump(c.key)} title={`Scroll to ${c.letter} · ${c.label}`}><strong>{c.letter}</strong> {c.label}</button>)}
       <span className="muted xs scroll-hint"><Icon name="chevron" size={10} />Scroll the grid sideways, or open a row for all seven fields</span>
     </div>
-    <div className="grid-wrap">
+    <div className="grid-wrap" ref={wrap}>
       <AgGridReact<Row>
         theme={gridTheme} rowData={data} columnDefs={columns} context={context}
         getRowId={getRowId} isFullWidthRow={isFullWidthRow} fullWidthCellRenderer={FullWidthCell} getRowHeight={getRowHeight}
-        tooltipShowDelay={400}
+        tooltipShowDelay={400} tooltipInteraction popupParent={POPUP_PARENT}
         defaultColDef={DEFAULT_COL}
         undoRedoCellEditing stopEditingWhenCellsLoseFocus enterNavigatesVerticallyAfterEdit
-        onGridReady={e => { gridApi.current = e.api }}
+        onGridReady={e => { gridApi.current = e.api; wrap.current?.querySelector('.ag-body-horizontal-scroll-viewport')?.setAttribute('aria-label', 'Scroll columns') }}
         onCellKeyDown={onKey}
         onCellEditingStarted={cursorToEnd}
         onCellDoubleClicked={e => { if (!editable && e.data?.kind === 'skill' && e.colDef.colId !== 'skill') onLockedEdit() }}
         onCellValueChanged={e => { if (e.data.kind === 'skill' && e.oldValue !== e.newValue) void onEdit(e.data.id, e.colDef.colId as IsatvonField, String(e.newValue ?? '')) }}
+        onFirstDataRendered={() => requestAnimationFrame(() => requestAnimationFrame(() => setPainted(true)))}
       />
+      {!painted && rows.length > 0 && <div className="grid-cover" role="status" aria-label="Loading the skills grid"><SkeletonTable /></div>}
     </div>
     </>
+  )
+}
+
+// While skills load: the grid's own shape (column jump bar, header with the real columns and widths, an agent row and
+// skill rows), so the pane reads as a grid filling in rather than an empty area. Replaced as soon as rows arrive.
+function GridSkeleton() {
+  return (
+    <div className="grid-skel" role="status" aria-label="Loading the skills grid">
+      <div className="col-jump" aria-hidden><span className="muted xs">Columns</span>{ISATVON.map(c => <span key={c.key} className="col-chip"><strong>{c.letter}</strong> {c.label}</span>)}</div>
+      <SkeletonTable />
+      <span className="sr-only">Loading the skills grid</span>
+    </div>
+  )
+}
+function SkeletonTable() {
+  const shape = (n: number) => [86, 64, 78][n % 3]
+  return (
+    <div className="grid-skel-table" aria-hidden>
+      <div className="gs-row gs-head"><span>Agent › Skill</span>{ISATVON.map(c => <span key={c.key}>{c.letter} · {c.label}</span>)}</div>
+      {[0, 1].map(g => <div key={g}>
+        <div className="gs-group"><div className="sk-line" style={{ width: 180 }} /></div>
+        {[0, 1, 2].map(r => <div key={r} className="gs-row">
+          <span><div className="sk-line" style={{ width: '70%' }} /><div className="sk-line" style={{ width: '30%' }} /></span>
+          {ISATVON.map((c, i) => <span key={c.key}><div className="sk-line" style={{ width: `${shape(i + r + g)}%` }} />{c.key === 'instructions' && <div className="sk-line" style={{ width: '55%' }} />}</span>)}
+        </div>)}
+      </div>)}
+    </div>
   )
 }
 
@@ -311,10 +347,14 @@ export function Center({ snap, info }: StepProps) {
   const [rows, setRows] = useState<SkillRow[]>([])
   const [confirm, setConfirm] = useState(false)
   const [reopen, setReopen] = useState(false)
-  const lockedEdit = () => toast('3.2 is read-only because the workflow has moved on. Use “Reopen 3.2 to edit” above the grid.', 'info', '3.2')
+  // An edit attempt on the read-only grid moves focus to the Reopen control above it (no notice).
+  const lockedEdit = () => document.getElementById('reopen-32')?.focus()
   const [showChanges, setShowChanges] = useState(true)
   const { busy, run } = useAction()
-  useEffect(() => { if (fetched) setRows(fetched) }, [fetched])
+  // The revision the rows came from: while the query still shows the previous (placeholder) result, an empty grid is
+  // loading, not empty.
+  const [loadedRev, setLoadedRev] = useState<number>()
+  useEffect(() => { if (fetched) { setRows(fetched); setLoadedRev(snap.skillsRevision) } }, [fetched]) // eslint-disable-line react-hooks/exhaustive-deps
   // Edits against the extracted (model) values, counted the same way as the SOW.
   const cellCounts = rows.reduce((c, r) => {
     for (const col of ISATVON) if (r.fields[col.key] !== r.original[col.key]) addCounts(c, countSegs(diffWords(r.original[col.key], r.fields[col.key])))
@@ -330,12 +370,21 @@ export function Center({ snap, info }: StepProps) {
 
   const reviewReason = !info.editable ? 'The grid is read-only' : extracting ? 'Extraction still running'
     : withErrors ? `Fix validation errors in ${withErrors} row${withErrors === 1 ? '' : 's'} first` : snap.gridReviewedAt ? `Reviewed ${fmtTime(snap.gridReviewedAt)}` : undefined
-  const generateReason = !info.editable ? 'The grid is read-only' : !snap.gridReviewedAt ? 'Mark the grid reviewed first' : undefined
+  // Start marks the grid reviewed (when it is not yet) and then asks to generate the contract, so the review record stays.
+  const generateReason = !info.editable ? 'The grid is read-only' : reviewReason?.startsWith('Reviewed') ? undefined : reviewReason
+  const editReason = info.editable ? (rows.length ? undefined : 'No skills to edit yet') : snap.activeStep > 2 ? undefined : 'The grid is read-only'
+  // Approve only asks; the popup's Start marks the grid approved (reviewed) and begins the checks on Template.
+  const startGenerate = () => setConfirm(true)
+  const startChecks = () => {
+    setConfirm(false)
+    void run('Generate contract', async () => { if (!snap.gridReviewedAt) await api.markGridReviewed(); await api.generateContract(); return true }, { step: 3 })
+      .then(ok => { if (ok) goScreen('4.2') })
+  }
 
   let body
   if (failed) body = <ErrorState title={`${failed.label} failed`}>{failed.error}</ErrorState>
   else if (error) body = <ErrorState title="Could not load skills" action={<button className="btn btn-primary" onClick={() => refetch()}><Icon name="refresh" />Retry</button>}>{error.message}</ErrorState>
-  else if (extracting || (isLoading && !rows.length)) body = <><Banner tone="info" icon="spinner">Extracting agents and their skills from the approved SOW. Rows appear when the spreadsheet update finishes.</Banner><Skeleton rows={8} label="Extracting skills" /></>
+  else if (extracting || (!rows.length && (isLoading || loadedRev !== snap.skillsRevision))) body = <><Banner tone="info" icon="spinner">Extracting agents and their skills from the approved SOW. Rows appear when the spreadsheet update finishes.</Banner><GridSkeleton /></>
   else if (!rows.length) body = <Empty icon="file" title="No skills extracted">Skills come from the extraction run that starts when the SOW is approved in 3.1.</Empty>
   else body = <>
     <div className="editor-bar grid-bar">
@@ -350,14 +399,14 @@ export function Center({ snap, info }: StepProps) {
       </div>}
     </div>
     {!info.editable && info.state !== 'locked' && (
-      <Banner tone="warn" icon="lock" action={snap.activeStep > 2 && <button className="btn btn-secondary sm" disabled={!!busy} onClick={() => setReopen(true)}><Icon name="edit" />Reopen 3.2 to edit</button>}>
-        <strong>Read-only.</strong> Cells can't be edited because the workflow has moved past 3.2{snap.activeStep > 2 ? ` (now at ${['', '3.1', '3.2', '4.1', '4.4'][snap.activeStep]})` : ''}.
+      <Banner tone="warn" icon="lock" action={snap.activeStep > 2 && <button id="reopen-32" className="btn btn-secondary sm" disabled={!!busy} onClick={() => setReopen(true)}><Icon name="edit" />Reopen Skills grid to edit</button>}>
+        <strong>Read-only.</strong> Cells can't be edited because the workflow has moved past the Skills grid{snap.activeStep > 2 ? ` (now at ${['', 'SOW', 'Skills grid', 'Validation', 'Test results'][snap.activeStep]})` : ''}.
       </Banner>)}
     <SkillGrid rows={rows} setRows={setRows} editable={info.editable} showChanges={showChanges} onLockedEdit={lockedEdit} />
   </>
 
   return (
-    <Pane id="center-title" kicker="3.2 · Skill review" title="ISATVON skill workbench" className="center grid-pane"
+    <Pane id="center-title" title="Grid" className="center grid-pane"
       actions={rows.length > 0 && <div className="stats" aria-label="Grid summary">
         <span><strong>{agents}</strong> agents</span><span><strong>{rows.length}</strong> skills</span>
         <span className={withErrors ? 'tone-err' : ''}><Icon name={withErrors ? 'alert' : 'check'} size={12} /><strong>{withErrors}</strong> with errors</span>
@@ -368,72 +417,43 @@ export function Center({ snap, info }: StepProps) {
           <span className="muted sm kbd-hint">Double-click a cell or start typing to edit in place · Tab/Enter saves · Esc cancels · Enter on Skill expands · Shift+Enter shows SOW passage · Ctrl+Z undoes</span>
         </div>
         <div className="row">
-          <GateButton variant="secondary" reason={reviewReason} busy={busy === 'Mark reviewed'} icon="check"
-            onClick={() => run('Mark reviewed', () => api.markGridReviewed(), { success: 'Grid marked reviewed.', step: 2 })}>Mark grid reviewed</GateButton>
-          <GateButton action="generate" reason={generateReason} busy={busy === 'Generate contract'} successKey={snap.workflow?.runId} onClick={() => setConfirm(true)}>Generate ISATVON Contract</GateButton>
+          {/* Edit: the existing grid edit control (in place editing; Reopen when the workflow has moved on). */}
+          <GateButton variant="secondary" icon="edit" {...tips('3.2', 'Edit')} reason={editReason}
+            onClick={() => info.editable ? document.querySelector<HTMLElement>('.grid-pane .ag-cell[col-id="instructions"]')?.focus() : setReopen(true)}>Edit</GateButton>
+          <GateButton action="generate" {...tips('3.2', 'Approve')} reason={generateReason} busy={busy === 'Generate contract' || busy === 'Mark reviewed'} successKey={snap.workflow?.runId} onClick={startGenerate}>Approve</GateButton>
         </div>
       </>}>
       {snap.gridReviewedAt && info.editable && <Banner tone="ok" icon="check">Grid reviewed at {fmtTime(snap.gridReviewedAt)}. Any further edit clears the review.</Banner>}
       {body}
-      <Confirm open={reopen} title="Reopen 3.2 ISATVON skills grid?" confirmLabel="Reopen 3.2" onClose={() => setReopen(false)}
-        onConfirm={() => { setReopen(false); void run('Reopen', () => api.reopen(2), { success: '3.2 reopened: the grid is editable. 4.1–4.4 are marked stale.', step: 2 }) }}
+      <PassageDialog snap={snap} />
+      <Confirm open={reopen} title="Reopen the ISATVON Skills grid?" confirmLabel="Reopen Skills grid" onClose={() => setReopen(false)}
+        onConfirm={() => { setReopen(false); void run('Reopen', () => api.reopen(2), { success: 'Skills grid reopened: the grid is editable. Validation and testing are marked stale.', step: 2 }) }}
         consequences={[
           'The grid becomes editable again; the grid review is cleared when you edit.',
-          'Validation (4.1–4.3) and testing (4.4) are marked stale and must be re-run before deploying again.',
+          'Validation, Manifest JSON, Generated code and Test results are marked stale and must be re-run before deploying again.',
           'Whatever is deployed to Staging stays deployed until you deploy a new version.',
         ]} />
-      <Confirm open={confirm} title="Generate ISATVON Contract?" confirmLabel="Start validation workflow" onClose={() => setConfirm(false)}
-        onConfirm={() => {
-          setConfirm(false)
-          void run('Generate contract', () => api.generateContract(), { success: 'Temporal validation workflow started. It keeps running in the background.', step: 3 })
-            .then(() => goStep(3))
-        }}
-        consequences={[
-          `Starts a Temporal validation workflow for ${rows.length} skills across ${agents} agents, based on approved SOW v${snap.sow?.approval?.version}.`,
-          'Runs A contract validation, B dependency check and C AST code generation; D retry/fallback runs only if C fails.',
-          'The grid becomes read-only and 4.1 shows live activity status from Temporal.',
-          'Nothing is written to BAM_db or deployed. That happens in 4.4.',
-        ]} />
+      {/* Native modal dialog: focus moves in and is kept there, Esc closes, focus returns to Approve. */}
+      <Dialog open={confirm} title="Generate contract and run checks?" onClose={() => setConfirm(false)} footer={<>
+          <button className="btn btn-secondary" onClick={() => setConfirm(false)}>Cancel</button>
+          <Tip text={tips('3.2', 'Start').tip}><button className="btn btn-primary" onClick={startChecks} autoFocus>Start</button></Tip></>}>
+        <p>Starts the contract, dependency and translation checks for {rows.length} skill{rows.length === 1 ? '' : 's'} across {agents} agent{agents === 1 ? '' : 's'}. A retry and fallback runs only if a check fails. Nothing is written to BAM_db yet.</p>
+      </Dialog>
     </Pane>
   )
 }
 
-export function Left({ snap }: StepProps) {
+/** A skill row's SOW passage (the row's SOW link or Shift+Enter): the approved SOW, highlighted at that passage. */
+function PassageDialog({ snap }: { snap: StepProps['snap'] }) {
   const passage = useUi(s => s.passage)
   const sow = snap.sow
   return (
-    <Pane id="left-title" kicker="Context · read-only" title="Approved SOW"
-      actions={sow?.approval && <StatusPill status="done" text={`v${sow.approval.version}`} />}>
-      {!sow?.approval ? <Empty icon="lock" title="No approved SOW">Approve the SOW in 3.1 to see it here.</Empty> : <>
-        <p className="muted sm">Approved <Time iso={sow.approval.at} /> by {sow.approval.by}. Select <strong>SOW</strong> on a skill row to jump to its passage.</p>
-        <SowMeta sow={sow} compact />
+    <Dialog open={!!passage && !!sow?.approval} title="SOW passage" onClose={() => setUi({ passage: undefined })} className="dialog wide"
+      footer={<button className="btn btn-secondary" onClick={() => setUi({ passage: undefined })}>Close</button>}>
+      {sow?.approval && <>
+        <p className="muted sm">Approved SOW v{sow.approval.version} · <Time iso={sow.approval.at} /> by {sow.approval.by}</p>
         <ReadonlySow html={sow.html} highlight={passage} />
       </>}
-    </Pane>
-  )
-}
-
-// Evidence only: draft-vs-certified manifest, certification and version history; extraction is secondary.
-export function Right({ snap }: StepProps) {
-  const extracting = snap.extraction.some(s => s.status === 'running' || s.status === 'queued' || s.status === 'failed')
-  return (
-    <Pane id="right-title" kicker="Evidence and status" title="Manifest and certification">
-      <Section title="Manifest diff · draft vs certified"><ManifestCompare snap={snap} /></Section>
-      <Section title="Certification"><CertChecklist snap={snap} compact /></Section>
-      <Section title="Versions" aside={<button className="link xs" onClick={() => goScreen('3.4')}>All in 3.4 →</button>}><VersionHistory snap={snap} limit={4} /></Section>
-      <Section title="Review gate">
-        <dl className="kv">
-          <div><dt>SOW approval</dt><dd>{snap.sow?.approval ? <>v{snap.sow.approval.version} · <Time iso={snap.sow.approval.at} /></> : 'Not approved'}</dd></div>
-          <div><dt>Grid review</dt><dd>{snap.gridReviewedAt ? <Time iso={snap.gridReviewedAt} prefix="Reviewed " /> : 'Not reviewed'}</dd></div>
-          <div><dt>Contract</dt><dd>{snap.workflow ? <span className="mono xs">{snap.workflow.workflowId}</span> : 'Not generated'}</dd></div>
-        </dl>
-      </Section>
-      <details className="accordion" open={extracting}>
-        <summary><Icon name="clock" size={12} />Extraction activity<span className="muted xs">{snap.extraction.length ? `${snap.extraction.filter(s => s.status === 'succeeded').length}/${snap.extraction.length}` : 'not run'}</span></summary>
-        {snap.extraction.length === 0
-          ? <p className="muted sm">Starts when the SOW is approved: approval gate, dual-context parsing, agent / skill extraction, spreadsheet update. Extraction success is not certification.</p>
-          : <StageList stages={snap.extraction} />}
-      </details>
-    </Pane>
+    </Dialog>
   )
 }

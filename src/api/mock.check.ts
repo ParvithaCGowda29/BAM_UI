@@ -83,7 +83,7 @@ assert.equal((await snap()).activeStep, 4)
 
 await api.runTests()
 await wait(async () => (await snap()).tests?.promptfoo.status === 'succeeded')
-await assert.rejects(api.commitToPostgres(), /Review the Promptfoo results/, 'unreviewed run cannot persist')
+await assert.rejects(api.commitToPostgres(), /Review the assertion results/, 'unreviewed run cannot persist')
 await api.markTestsReviewed()
 await api.commitToPostgres()
 await wait(async () => !!(await snap()).persist.committed)
@@ -101,6 +101,21 @@ const s2 = await snap()
 assert.deepEqual([s2.sow!.previous!.version, s2.sow!.previous!.html], [s1.sow!.version, s1.sow!.html], 'previous saved version is kept for comparison')
 assert.match(s2.sow!.invalidated!.reason, /Edited after approval/)
 assert.equal(s2.steps[1].state, 'locked')
+
+// Standardize hands on only the ready files: the held one stays out, the same set is never started twice, and the
+// larger set (the held file accepted later) starts a new run.
+{
+  const b = createMockApi({ speed: 0.01 })
+  const bs = () => b.getSnapshot()
+  await b.uploadFile({ name: 'rfq.pdf', size: 1000 }, () => {})
+  await b.uploadFile({ name: 'drawing.png', size: 1000 }, () => {})
+  await wait(async () => (await bs()).uploads.every(u => u.scan === 'verified'))
+  const [pdf, png] = (await bs()).uploads.map(u => u.id)
+  assert.deepEqual((await b.startIngestionRun([pdf])).fileIds, [pdf], 'only the ready file is ingested')
+  await assert.rejects(b.startIngestionRun([pdf]), /already ingested/, 'the same set is not started twice')
+  await assert.rejects(b.startIngestionRun(['nope']), /No ready files/)
+  assert.deepEqual((await b.startIngestionRun([pdf, png])).fileIds, [pdf, png], 'the accepted file joins a new run')
+}
 
 // A failing Promptfoo run can be neither reviewed nor persisted/deployed.
 {

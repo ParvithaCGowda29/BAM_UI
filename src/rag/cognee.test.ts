@@ -60,7 +60,7 @@ test('Cognee runner: add OKF concepts + released objects, cognify, poll status, 
     failCognify = true
     rag.start()
     await until(() => rag.getState().steps[1].status === 'failed')
-    assert.match(rag.getState().steps[1].error!, /Cognee: POST \/api\/v1\/cognify -> HTTP 500: .*LLM key missing/)
+    assert.match(rag.getState().steps[1].error!, /Context Engine: POST \/api\/v1\/cognify -> HTTP 500: .*LLM key missing/)
     failCognify = false; polls = 0
     rag.retry('extract')
     await until(() => rag.getState().steps.every(x => x.status === 'done'))
