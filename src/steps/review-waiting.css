@@ -5,8 +5,8 @@
 .rw-mark::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%); animation: rw-pulse 3.2s ease-in-out infinite; }
 .rw-mark > .rb-sm, .rw-mark > .icon { position: absolute; }
 .rw-mark > .icon { color: var(--muted); }
-.rw-title { margin: 0; font-size: 18px; font-weight: 700; }
-.rw-sub { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.rw-title { margin: 0; font-size: 16px; font-weight: 700; }
+.rw-sub { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
 @keyframes rw-pulse { 0%, 100% { transform: scale(.92); opacity: .7; } 50% { transform: scale(1.04); opacity: 1; } }
 
 /* Hand-off: the large ring shrinks up toward the cards while the text fades; the review fades in and each card's

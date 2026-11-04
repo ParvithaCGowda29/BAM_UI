@@ -21,8 +21,8 @@
 .login-card {
   /* Whole card fits the window height: sizes below scale with vh, so short or zoomed screens never scroll. */
   width: min(1320px, 90vw); min-height: min(800px, calc(100vh - 2 * var(--lg-pad)));
-  display: grid; grid-template-columns: minmax(0, 580px) minmax(0, 580px); justify-content: space-between; align-items: center;
-  gap: 40px; padding: clamp(12px, 4.4vh, 40px) clamp(12px, 4.4vh, 40px) clamp(12px, 4.4vh, 40px) 60px; border-radius: clamp(22px, 4vh, 34px);
+  display: grid; grid-template-columns: minmax(0, 580px) minmax(0, 580px); /* carousel left, form right */ justify-content: space-between; align-items: center;
+  gap: 40px; padding: clamp(12px, 4.4vh, 40px) 60px clamp(12px, 4.4vh, 40px) clamp(12px, 4.4vh, 40px); border-radius: clamp(22px, 4vh, 34px);
   background: var(--lg-card); border: 1px solid var(--lg-border); box-shadow: var(--lg-card-shadow);
 }
 .login-page :focus-visible { outline: 2px solid var(--lg-link); outline-offset: 2px; box-shadow: none; }
@@ -30,8 +30,7 @@
 /* Left column */
 .login-left { align-self: stretch; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .login-brand { display: flex; align-items: center; gap: 16px; }
-.login-logo { width: clamp(44px, 7.5vh, 68px); height: clamp(44px, 7.5vh, 68px); border-radius: 12px; flex: none; object-fit: cover; }
-:root[data-theme="light"] .login-logo { background: #0B1526; }
+/* removed small bull */
 .login-name { font-size: clamp(20px, 3vh, 26px); font-weight: 700; letter-spacing: .02em; line-height: 1.1; }
 .login-product { font-size: 14px; color: var(--lg-muted); margin-top: 2px; }
 .login-title { font-size: clamp(26px, 5.2vh, 46px); line-height: 1.1; font-weight: 800; margin: auto 0 0; padding-top: clamp(8px, 4vh, 56px); letter-spacing: .01em; }
@@ -40,7 +39,7 @@
 
 .login-form { display: flex; flex-direction: column; }
 .login-field { display: flex; flex-direction: column; margin-bottom: clamp(6px, 2vh, 20px); }
-.login-field label { font-size: 15px; font-weight: 700; margin-bottom: clamp(4px, 1vh, 10px); }
+.login-field label { font-size: 14px; font-weight: 700; margin-bottom: clamp(4px, 1vh, 10px); }
 .login-field input {
   height: clamp(40px, 6.2vh, 56px); width: 100%; padding: 0 18px; border-radius: 12px; font: inherit; font-size: 16px;
   color: var(--lg-text); background: var(--lg-input); border: 1px solid var(--lg-border);
@@ -68,13 +67,13 @@
 .login-link:hover { text-decoration: underline; }
 
 .login-alert {
-  display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 15px;
+  display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 14px;
   color: var(--lg-err); background: color-mix(in srgb, var(--lg-err) 10%, transparent); border: 1px solid color-mix(in srgb, var(--lg-err) 40%, transparent);
 }
 .login-submit {
   margin-top: clamp(8px, 2.2vh, 22px); height: clamp(42px, 6.4vh, 58px); border: 0; border-radius: 12px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-  font: inherit; font-size: 18px; font-weight: 700; color: #161008;
+  font: inherit; font-size: 16px; font-weight: 700; color: #161008;
   background: linear-gradient(180deg, #FFA63A 0%, #EC6F26 100%);
   box-shadow: 0 12px 30px rgba(236, 111, 38, .35), inset 0 1px 0 rgba(255, 255, 255, .35);
   transition: filter .15s ease, box-shadow .15s ease;
@@ -102,7 +101,7 @@
 .login-panel-body { flex: none; padding: 0 14px clamp(10px, 2vh, 18px); }
 .login-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 clamp(6px, 1.4vh, 12px) 14px; padding: 0; }
 .login-chips li {
-  font-size: 13px; padding: 7px 14px; border-radius: 10px;
+  font-size: 14px; padding: 7px 14px; border-radius: 10px;
   background: rgba(255, 255, 255, .2); border: 1px solid rgba(255, 255, 255, .35);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
@@ -157,14 +156,10 @@
   .login-link { font-size: 14px; white-space: nowrap; }
 }
 /* Login: the shared BrandLockup, larger. */
-.login-lockup { --bl: clamp(30px, 4.4vh, 40px); }
-.login-lockup + .login-product { margin-top: 6px; }
+.login-lockup { display: block; width: 215px; max-width: 100%; height: auto; margin-bottom: clamp(8px, 1.6vh, 16px); }
 
-/* Product chip after "FDE workspace" (accent tint, login tokens). */
-.login-chip { display: inline-flex; align-items: center; margin-left: 8px; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; vertical-align: 1px;
-  color: var(--lg-link); background: color-mix(in srgb, var(--lg-link) 14%, transparent); }
 /* Arrived from a Masters switch: slim full-width amber banner above everything (soft in dark mode). */
 .login-banner { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 6px 16px;
-  font-size: 13px; font-weight: 500; text-align: center; color: #F0B54B; background: #241C0F; border-bottom: 1px solid rgba(240, 181, 75, .25); }
+  font-size: 14px; font-weight: 500; text-align: center; color: #F0B54B; background: #241C0F; border-bottom: 1px solid rgba(240, 181, 75, .25); }
 :root[data-theme="light"] .login-banner { color: #9A6200; background: #FFF4DE; border-bottom-color: #F3D9A4; }
 .login-page.has-banner { min-height: calc(100vh - 36px); }

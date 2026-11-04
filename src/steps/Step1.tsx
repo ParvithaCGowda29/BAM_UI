@@ -134,7 +134,6 @@ function SowEditor({ sow, editable, info }: { sow: Sow; editable: boolean; info:
           {!approved && !decideReason && <span className="muted sm">Approving v{sow.version} unlocks the Grid and extracts skills from this exact version.</span>}
         </div>
         <div className="row">
-          <GateButton variant="secondary" icon="edit" {...tips('3.1', 'Edit')} reason={decideReason} onClick={() => editor?.commands.focus('end')}>Edit</GateButton>
           {/* Reopened with a still-valid approval: Approve keeps it and closes the review (no second approval). */}
           {approved && info.editable
             ? <GateButton action="approve" {...tips('3.1', 'Approve')} reason={decideReason} busy={busy === 'Close SOW review'}

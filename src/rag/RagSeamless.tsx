@@ -329,7 +329,6 @@ function FailedCard({ q, flash }: { q: Row; flash: boolean }) {
       <div><h4 className="cq-dh">Source</h4>
         <p className="sm">{f.source}{to && <> · <button className="link sm" onClick={() => navigate(to)}>Open in {f.master} master</button></>}</p></div>
       <div className="row cq-detail-actions">
-        <GateButton variant="secondary" icon="edit" {...tips('2.3', 'Edit')} reason={to ? undefined : 'No master is behind this answer'} onClick={() => { if (to) navigate(to) }}>Edit</GateButton>
         <GateButton icon="refresh" {...tips('2.3', 'Retry')} busy={q.status === 'running'} onClick={() => void retryQuestion(q.id)}>Retry</GateButton>
       </div>
     </article>

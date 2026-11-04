@@ -1,7 +1,7 @@
 // npm test: Upload goal capture → ISATVON draft, the assistant's draft edits, and the draft's chips.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { EXAMPLE, OTHERS, WHAT_OPTIONS, WHERE_OPTIONS, WHO_OPTIONS, amountOf, canAddFiles, conversationChips, flowLine, applyEdit, changedSections, draftChips, draftHtml, draftReply, expandGoal, missingUploads, plain, readHtml, sentence } from './goal.ts'
+import { EXAMPLE, OTHERS, WHAT_OPTIONS, WHERE_OPTIONS, WHO_OPTIONS, amountOf, canAddFiles, goalStage, parseGoal, conversationChips, flowLine, applyEdit, changedSections, draftChips, draftHtml, draftReply, expandGoal, missingUploads, plain, readHtml, sentence } from './goal.ts'
 
 test('goal: the example expands into the quotation draft and its required uploads', () => {
   assert.equal(sentence(EXAMPLE), 'Build an AI agent that automates quoting for sales managers at SMB manufacturers in India')
@@ -36,12 +36,12 @@ test('goal: a sign-off threshold edit updates Automation and Variables (wirefram
 
 test('goal: chips follow the draft on screen', () => {
   const d = expandGoal(EXAMPLE)
-  assert.deepEqual(draftChips(d, []), ['Which files are still missing?', 'Explain the Variables in plain words', 'Add a margin guardrail'])
+  assert.deepEqual(draftChips(d, []), ['Which files are still missing?', 'What do the Variables mean?', 'What does margin mean?'])
   const t = applyEdit(d, 'quotes above 2 lakh need senior sign-off')!.draft
-  assert.deepEqual(draftChips(t, []), ['Which files are still missing?', 'Explain the Variables in plain words', 'Add a margin guardrail', 'Show what changed in the draft'])
+  assert.deepEqual(draftChips(t, []), ['Which files are still missing?', 'What do the Variables mean?', 'What does margin mean?', 'What changed in the draft?'])
   const m = applyEdit(t, 'Add a margin guardrail')!.draft
-  assert.ok(!draftChips(m, []).includes('Add a margin guardrail'))
-  assert.match(draftReply(m, 'Show what changed in the draft', [])!, /Automation.*Variables/)
+  assert.ok(!draftChips(m, []).includes('What does margin mean?'))
+  assert.match(draftReply(m, 'What changed in the draft?', [])!, /Automation.*Variables/)
   assert.match(draftReply(d, 'Which files are still missing?', [])!, /Still required: Enquiry samples/)
 })
 
@@ -51,22 +51,34 @@ test('goal: editor HTML round-trips into the sections', () => {
   assert.equal(readHtml(d, edited).sections.O, '<strong>Signed</strong> quote with cost breakdown, approval status and an audit trail.')
 })
 
-test('goal: Add files opens only on approval, never on expansion', () => {
+test('goal: Add files opens as soon as the goal is expanded (no approval step)', () => {
   const draft = expandGoal(EXAMPLE)
   assert.equal(canAddFiles({ goal: EXAMPLE, draft: null, approved: false }), false)
-  assert.equal(canAddFiles({ goal: EXAMPLE, draft, approved: false }), false, 'expanded is not enough')
-  assert.equal(canAddFiles({ goal: { ...EXAMPLE, where: 'Europe' }, draft, approved: false }), false)
-  assert.equal(canAddFiles({ goal: EXAMPLE, draft, approved: true }), true)
+  assert.equal(canAddFiles({ goal: EXAMPLE, draft, approved: false }), true)
+})
+
+test('goal: panes open in order - middle, then files, then outputs', () => {
+  const draft = expandGoal(EXAMPLE)
+  assert.equal(goalStage({ goal: EXAMPLE, draft: null, approved: false }, 0), 1)
+  assert.equal(goalStage({ goal: EXAMPLE, draft, approved: true }, 0), 2)
+  assert.equal(goalStage({ goal: EXAMPLE, draft, approved: true }, 2), 3)
+})
+
+test('goal: a typed free-form goal is parsed without losing its words', () => {
+  assert.deepEqual(parseGoal('Quoting for Sales managers at SMB manufacturers in India'), EXAMPLE)
+  assert.deepEqual(parseGoal('Build an AI agent that automates RFQ responses for Procurement teams in Europe.'), { what: 'RFQ responses', who: 'Procurement teams', where: 'Europe' })
+  assert.equal(parseGoal('invoice matching').what, 'invoice matching')
+  assert.equal(expandGoal(parseGoal('RFQ responses for Procurement teams in Europe')).title, 'RFQ Response Agent')
 })
 
 test('goal: at most two chips; after the first message only follow-ups to it', () => {
   const d = expandGoal(EXAMPLE), files = ['RFQ_Package.pdf']
-  assert.deepEqual(conversationChips(d, files, null), ['Which files are still missing?', 'Explain the Variables in plain words'])
+  assert.deepEqual(conversationChips(d, files, null), ['Which files are still missing?', 'What do the Variables mean?'])
   assert.deepEqual(conversationChips(d, files, 'Which files are still missing?'), ['What goes into Pricing rules?', 'What goes into Product catalogue?'])
   assert.match(draftReply(d, 'What goes into Pricing rules?', files)!, /^Pricing rules: rates, discounts and margins\. It is required/)
   const t = applyEdit(d, 'quotes above 2 lakh need senior sign-off')!.draft
-  assert.deepEqual(conversationChips(t, files, 'quotes above 2 lakh need senior sign-off'), ['Show what changed in the draft', 'Change the sign-off threshold to 5 lakh'])
-  assert.deepEqual(conversationChips(d, files, 'Explain the Variables in plain words'), ['Add a margin guardrail', 'Quotes above 2 lakh need a senior sign-off'])
+  assert.deepEqual(conversationChips(t, files, 'quotes above 2 lakh need senior sign-off'), ['What changed in the draft?', 'What does the sign-off threshold do?'])
+  assert.deepEqual(conversationChips(d, files, 'What do the Variables mean?'), ['What does margin mean?', 'What does the sign-off threshold do?'])
   assert.deepEqual(conversationChips(d, files, 'hello there'), [], 'an unrelated message gets no generic chips back')
   for (const last of [null, 'Which files are still missing?', 'Add a margin guardrail']) assert.ok(conversationChips(d, files, last).length <= 2)
 })

@@ -102,7 +102,8 @@ function customProfile(what: string): Profile {
     uploads: [req('Sample inputs', 'Real examples of what the agent receives', /sample|input|example|request/i), req('Business rules', 'Rules, rates and exceptions', /rule|rate|guideline|sop|process/i),
       req('Reference data', 'Master data the agent looks up', /reference|master|catalog|data|list/i), opt('Approval policy', 'Limits and approver roles', /approv|polic|limit|authori/i)] }
 }
-const profileOf = (g: Goal) => PROFILES[g.what.trim()] ?? customProfile(g.what)
+const profileKey = (what: string) => { const w = what.trim().toLowerCase(); return Object.keys(PROFILES).find(k => w === k.toLowerCase() || w.startsWith(k.toLowerCase() + ' ')) }
+const profileOf = (g: Goal) => PROFILES[profileKey(g.what) ?? ''] ?? customProfile(g.what)
 
 export const flowLine = (g: Goal) => profileOf(g).flow
 
@@ -168,7 +169,17 @@ export function draftReply(d: Draft, text: string, uploaded: string[]): string |
   const into = /^what goes into (.+?)\??$/i.exec(text.trim())
   const u = into && d.uploads.find(x => x.name.toLowerCase() === into[1].trim().toLowerCase())
   if (u) return `${u.name}: ${u.hint.charAt(0).toLowerCase()}${u.hint.slice(1)}. ${u.required ? 'It is required' : 'It is optional'}; any file whose name says what it holds (for example ${u.name.toLowerCase().replace(/\s+/g, '-')}.pdf) is matched.`
-  if (/explain.*variables|variables.*plain/i.test(text))
+  if (/what does isatvon mean/i.test(text))
+    return 'ISATVON is the seven-part contract for each skill: Instructions, Source data, Automation, Tech Stack, Variables, Outcome and Notify on next. The draft above fills each part for your goal.'
+  if (/what files should i add/i.test(text)) {
+    const need = d.uploads.filter(u => u.required)
+    return `I need: ${need.map(u => `${u.name} (${u.hint.charAt(0).toLowerCase()}${u.hint.slice(1)})`).join(', ')}. Add them on the left; I match them by file name.`
+  }
+  if (/what does (the )?margin( guardrail)?( mean| do)\??$/i.test(text.trim()))
+    return 'Margin is the share of a quote price that is profit after cost. A minimum margin guardrail stops me from sending a quote below it without a person approving. If you want one, tell me the percentage.'
+  if (/what does (the )?sign-?off threshold( do| mean)\??$/i.test(text.trim()))
+    return `The sign-off threshold is the ${d.item.toLowerCase()} value above which a senior person must approve before anything goes out. Tell me the amount if you want to set it.`
+  if (/variables/i.test(text) && /what|explain|mean|plain/i.test(text))
     return `Variables are the values the team can change without rebuilding the agent. Right now: ${plain(d.sections.V)}`
   if (/what changed|changes|diff/i.test(text)) {
     const ch = changedSections(d)
@@ -180,9 +191,9 @@ export function draftReply(d: Draft, text: string, uploaded: string[]): string |
 export function draftChips(d: Draft, uploaded: string[]): string[] {
   return [
     missingUploads(d, uploaded).some(u => u.required) && 'Which files are still missing?',
-    'Explain the Variables in plain words',
-    d.quote && !/minimum margin/i.test(plain(d.sections.V)) && 'Add a margin guardrail',
-    changedSections(d).length > 0 && 'Show what changed in the draft',
+    'What do the Variables mean?',
+    d.quote && !/minimum margin/i.test(plain(d.sections.V)) && 'What does margin mean?',
+    changedSections(d).length > 0 && 'What changed in the draft?',
   ].filter((c): c is string => !!c)
 }
 
@@ -191,22 +202,21 @@ export function draftChips(d: Draft, uploaded: string[]): string[] {
  *  or Variables); an unrelated message gets none, so the generic opening set never returns. */
 export function conversationChips(d: Draft, uploaded: string[], last: string | null): string[] {
   if (last === null) return draftChips(d, uploaded).slice(0, 2)
-  const V = plain(d.sections.V), india = /india/i.test(d.goal.where)
+  const V = plain(d.sections.V)
   const margin = /minimum margin/i.test(V), threshold = /sign-off threshold/i.test(V)
-  const signOff = `${d.item} above ${india ? '2 lakh' : '200,000'} need a senior sign-off`
   const miss = missingUploads(d, uploaded).filter(u => u.required)
   let next: (string | false)[] = []
   if (amountOf(last) && /sign-?off|approv|threshold|senior/i.test(last))
-    next = ['Show what changed in the draft', `Change the sign-off threshold to ${india ? (/5 lakh/i.test(last) ? '3 lakh' : '5 lakh') : '500,000'}`]
+    next = ['What changed in the draft?', 'What does the sign-off threshold do?']
   else if (/margin/i.test(last))
-    next = ['Show what changed in the draft', `Set the minimum margin to ${/15\s*%/.test(last) ? '10' : '15'}%`]
+    next = ['What changed in the draft?', 'What does the margin guardrail do?']
   else if (/missing|still need|which files|what goes into/i.test(last)) {
     const asked = /what goes into (.+?)\??$/i.exec(last)?.[1]?.toLowerCase()
     const rest = miss.filter(u => u.name.toLowerCase() !== asked)
-    next = rest.length ? rest.slice(0, 2).map(u => `What goes into ${u.name}?`) : ['Explain the Variables in plain words']
+    next = rest.length ? rest.slice(0, 2).map(u => `What goes into ${u.name}?`) : ['What do the Variables mean?']
   }
-  else if (/variables/i.test(last)) next = [d.quote && !margin && 'Add a margin guardrail', !threshold && signOff]
-  else if (/what changed|changes|diff/i.test(last)) next = changedSections(d).includes('V') ? ['Explain the Variables in plain words'] : []
+  else if (/variables/i.test(last)) next = [d.quote && !margin && 'What does margin mean?', !threshold && 'What does the sign-off threshold do?']
+  else if (/what changed|changes|diff/i.test(last)) next = changedSections(d).includes('V') ? ['What do the Variables mean?'] : []
   return next.filter((c): c is string => !!c && c.toLowerCase() !== last.trim().toLowerCase()).slice(0, 2)
 }
 
@@ -221,7 +231,7 @@ export function readHtml(d: Draft, html: string): Draft {
 }
 
 // ---- the store (one draft per intake; saved as `bam-goal-v2`) --------------------------------------------------
-export interface GoalState { goal: Goal; draft: Draft | null; approved: boolean }
+export interface GoalState { goal: Goal; draft: Draft | null; approved: boolean; /** The goal as typed (shown as the first chat bubble). */ text?: string }
 const revive = (d: Draft | null) => d && { ...d, uploads: expandGoal(d.goal).uploads } // RegExps do not survive JSON
 // v2 = the dropdown goal (What no longer carries "automates"); the old free-text `bam-goal` is dropped.
 const GOAL_KEY = 'bam-goal-v2'
@@ -237,13 +247,24 @@ export function setGoal(patch: Partial<GoalState> | ((s: GoalState) => Partial<G
   gsubs.forEach(f => f())
 }
 export const getGoal = () => gs
-export const resetGoal = () => setGoal({ goal: EXAMPLE, draft: null, approved: false })
+export const resetGoal = () => setGoal({ goal: EXAMPLE, draft: null, approved: false, text: '' })
 export const useGoal = <T,>(select: (s: GoalState) => T) =>
   useSyncExternalStore(cb => { gsubs.add(cb); return () => { gsubs.delete(cb) } }, () => select(gs))
-/** "+ Add files" (approval gate, 29 Oct 2026; supersedes "unlocked on expansion"): locked until the goal draft is
- *  approved. Expanding, editing or re-expanding never unlocks it (re-expanding clears the approval). */
-export const canAddFiles = (s: GoalState) => s.approved
+/** "+ Add files" (4 Nov 2026, no approval gate): opens as soon as the goal is expanded into a draft. */
+export const canAddFiles = (s: GoalState) => !!s.draft
 /** The one lock every upload path checks (Add files menu, picker, drops, the review dialog's Add more, the uploader). */
 export const addFilesLocked = () => !canAddFiles(getGoal())
-/** The right pane shows the draft until it is approved, and only while no pack file is listed. */
-export const showsDraft = (s: GoalState, files: number) => !!s.draft && !s.approved && !files
+/** The draft now lives in the middle-pane chat (4 Nov 2026), never in the right pane. */
+export const showsDraft = (_s: GoalState, _files: number) => false
+
+/** Pane progression (4 Nov 2026): 1 = middle pane only, 2 = goal expanded (files pane opens), 3 = files added (outputs pane opens). */
+export const goalStage = (s: GoalState, files: number): 1 | 2 | 3 => !s.draft ? 1 : files > 0 ? 3 : 2
+
+/** Splits a typed goal "<what> for <who> in <where>" into the three parts the profile reads. Free-form text is valid:
+ *  parts that are not written fall back to neutral wording, and the whole text stays the What. */
+export function parseGoal(text: string): Goal {
+  const t = text.trim().replace(/^build an ai agent that automates\s+/i, '').replace(/[.\s]+$/, '')
+  const m = /^(.*?)\s+for\s+(.*?)(?:\s+in\s+(.+))?$/i.exec(t)
+  if (m && m[1].trim() && m[2].trim()) return { what: m[1].trim(), who: m[2].trim(), where: (m[3] ?? 'your market').trim() }
+  return { what: t, who: 'your team', where: 'your market' }
+}

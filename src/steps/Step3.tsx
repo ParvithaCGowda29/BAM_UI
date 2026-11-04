@@ -175,8 +175,6 @@ export function TemplateFooter({ snap, info }: StepProps) {
   const approveReason = !info.editable ? 'This screen is read-only' : failed || !r.m ? 'Available once all checks pass.' : dirty ? 'Save or discard your manifest edits first' : undefined
   const n = r.wf.activities.filter(x => x.key !== 'D').length
   return <FootIn title={failed ? 'A check failed' : `${n} of ${n} checks passed`} line={failed ? 'Retry runs the checks again; your edits are kept' : `manifest.json ${r.m?.version} · review it, then approve`}>
-    <GateButton variant="secondary" icon="edit" {...tips('4.2', 'Edit')} reason={editReason}
-      onClick={() => { setDrafts({ manifest: r.manifestJson }); setTimeout(() => document.querySelector<HTMLElement>('.tpl-manifest .monaco-editor textarea')?.focus(), 300) }}>Edit</GateButton>
     {failed ? <RetryRun snap={snap} info={info} screen="4.2" />
       : <GateButton action="approve" {...tips('4.2', 'Approve')} reason={approveReason}
           onClick={() => { if (draft !== undefined && !dirty) setDrafts({ manifest: undefined }); approve({ template: templateKey(r.wf) }); goScreen('4.3') }}>Approve</GateButton>}</FootIn>
@@ -193,8 +191,6 @@ export function TranslateFooter({ snap, info }: StepProps) {
   const reason = r.approved ? undefined : !templateApproved(a, r.wf) && r.wf?.status === 'succeeded' ? 'Approve the manifest in Template first' : r.approveReason
   return <FootIn title={r.approved ? `Approved for ${r.m ? shortHash(r.m.hash) : 'this hash'}` : r.m ? 'Artifact ready for isolated validation' : 'No translated artifact yet'}
     line={r.approved ? `Approved ${fmtTime(r.wf!.approval!.at)}` : 'Approves this manifest and its code for the sandbox run'}>
-    <GateButton variant="secondary" icon="edit" {...tips('4.3', 'Edit')} reason={!info.editable ? 'This screen is read-only' : !r.m ? 'No translated artifact yet' : undefined}
-      onClick={() => document.querySelector<HTMLElement>('.ws-body .monaco-editor textarea')?.focus()}>Edit</GateButton>
     {r.wf?.status === 'failed' ? <RetryRun snap={snap} info={info} screen="4.3" />
       : <GateButton action="validate" {...tips('4.3', 'Approve')} reason={reason} busy={busy === 'Approve artifact'} successKey={r.approved ? r.wf?.approval?.at : undefined} onClick={go}>Approve</GateButton>}</FootIn>
 }
@@ -332,7 +328,7 @@ export function TemplateCenter({ snap, info }: StepProps) {
   const live = r.running ? (last ? `${ANNOUNCE[last.key]} ${last.status === 'succeeded' ? 'passed' : last.status}` : 'Running checks') : failed ? 'A check failed' : 'Checks finished, ready for review'
   const state = approvedHere ? ['done', 'Approved'] : r.running ? ['running', 'Running'] : failed ? ['failed', 'Failed'] : ['needs_review', 'Needs review']
   const shown = open ? past.find(x => x.key === open) : undefined
-  const editing = draft !== undefined && r.editable && !approvedHere
+  const editing = r.editable && !approvedHere // the manifest edits in place (no Edit button)
   return (
     <Pane id="center-title" kicker="Check activities · manifest.json" title="Template" className="center"
       actions={<StatusPill status={state[0] as 'done'} text={state[1]} />}>

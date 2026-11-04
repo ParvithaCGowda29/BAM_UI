@@ -6,9 +6,9 @@ import { navigate } from '../../lib/route'
 import { EMAIL_RE, signInRequest } from './mockAuthAdapter'
 import { consumeFromMasters, safeNext, startSession } from './session'
 import { LOGIN_MESSAGES } from './loginMessages'
-import logo from '../../assets/login/bull-logo.png'
+import wordmarkLight from '../../assets/login/bullm-wordmark-light.png'
+import wordmarkDark from '../../assets/login/bullm-wordmark-dark.png'
 import panel from '../../assets/login/bull-panel.png'
-import { BrandLockup } from '../../components/BrandLockup'
 import './login.css'
 
 export function LoginPage() {
@@ -23,20 +23,17 @@ export function LoginPage() {
     {fromMasters && <div className="login-banner" role="status"><Icon name="info" size={14} />Your Masters session has ended - sign in to continue to Pipeline.</div>}
     <main className={`login-page${fromMasters ? ' has-banner' : ''}`}>
       <div className="login-card">
+        <Showcase />
         <section className="login-left">
           <div className="login-brand">
-            <img src={logo} alt="" width={68} height={68} className="login-logo" />
-            <div>
-              <BrandLockup className="login-lockup" />
-              <div className="login-product">FDE workspace<span className="login-chip">Pipeline</span></div>
-            </div>
+            {/* Login-only lockup derived from the transparent logo: two-tone wordmark + tagline, no bull. Vector logo should replace it. */}
+            <img src={theme === 'dark' ? wordmarkDark : wordmarkLight} alt="BuLLM. Enterprise Workflows. Intelligently Done." className="login-lockup" />
           </div>
           <h1 className="login-title">Welcome back</h1>
           <p className="login-lede">Sign in to your BuLLM workspace.</p>
           <SignInForm />
           <p className="login-note">Access is invite-only. Contact your administrator for an account.</p>
         </section>
-        <Showcase />
       </div>
     </main>
   </>)

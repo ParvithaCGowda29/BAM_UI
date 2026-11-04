@@ -29,7 +29,7 @@ import { GATE, askQuestion, isAsked, sufficiency, useChecks, useRunState, type R
 import { Icon, Tip, fmtBytes } from './ui'
 import Orb from './reactbits/Orb'
 import { UploadMessages, fileCounts, useUploadRows } from '../steps/UploadPanes'
-import { GoalCapture } from '../steps/GoalPanes'
+import { GoalCapture, GoalExpansion } from '../steps/GoalPanes'
 import { applyEdit, conversationChips, draftReply, getGoal, setGoal, useGoal, type Draft } from '../lib/goal.ts'
 
 
@@ -238,8 +238,8 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
   const goal = useGoal(s => s)
   // Goal flow (29 Oct 2026): the chips wait until files are uploaded, then come from the goal's draft (ThreadBody).
   const chipDraft = screenId === '1.1' && counts.uploadedCount > 0 ? goal.draft : null
-  const goalState = screenId !== '1.1' ? null : goal.draft ? `${goal.draft.title} · ${goal.approved ? 'Approved' : 'Draft'}`
-    : `Goal · ${goal.goal.what.trim() && goal.goal.who.trim() && goal.goal.where.trim() ? 'Ready' : 'Empty'}`
+  const goalState = screenId !== '1.1' ? null : goal.draft ? goal.draft.title
+    : 'Goal · Ready'
 
   // Hidden by the person only (Hide assistant); a stage change never hides it. The runtime provider stays mounted, so
   // the thread keeps its messages and background posts (the upload summary) still reach it while the pane is hidden.
@@ -286,6 +286,7 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
   const names = snap.uploads.map(u => u.name).join('\u0000')
   const chips = useMemo(() => !chipDraft || running ? [] : conversationChips(chipDraft, names ? names.split('\u0000') : [], since > 0 ? sentAll[sentAll.length - 1] : null),
     [chipDraft, running, names, since, userTexts])
+  const hasDraft = useGoal(s => !!s.draft)
   const composer = <Composer capture={capture} chips={chips} />
   // The first message: the idle Orb and greeting fade out over the conversation as it fades in (~300ms, no snap).
   const [leaving, setLeaving] = useState(false)
@@ -298,7 +299,7 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
       <ComposerPrimitive.AttachmentDropzone className="as-dropzone">
         {/* Upload, nothing said yet: the goal capture (29 Oct 2026) in place of the greeting. */}
         {empty && screenId === '1.1' ? <>
-          <div className="as-viewport"><GoalCapture snap={snap} />{files > 0 && <UploadMessages snap={snap} />}</div>
+          <div className="as-viewport">{hasDraft ? <GoalExpansion /> : <GoalCapture />}</div>
           {composer}
         </> : empty ? <div className="as-empty">
           <IdleOrb />
@@ -311,9 +312,9 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
           {/* One persistent list: stage updates are messages in it (never a replaced note). Only live progress
               (a Verify run in flight, uploads in flight) sits after the messages until it finishes. */}
           <ThreadPrimitive.Viewport className={`as-viewport${leaving ? ' as-fade-in' : ''}`}>
+            {screenId === '1.1' && hasDraft && <GoalExpansion />}
             <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage, EditComposer }} />
             {screenId === '2.3' && <QualityProgress />}
-            {screenId === '1.1' && files > 0 && <UploadMessages snap={snap} />}
             {/* Scrolled up to read history: a cue back to the newest message (assistant-ui disables it at the bottom). */}
             <ThreadPrimitive.ScrollToBottom className="as-jump"><Icon name="tb-arrow-down" size={14} />Jump to latest</ThreadPrimitive.ScrollToBottom>
           </ThreadPrimitive.Viewport>
@@ -435,9 +436,6 @@ function UserMessage() {
   return <MessagePrimitive.Root className="as-urow">
     <MessagePrimitive.Attachments components={{ Attachment: SentFile }} />
     <div className="as-uline">
-      <ActionBarPrimitive.Root className="as-uedit">
-        <ActionBarPrimitive.Edit className="as-ibtn" aria-label="Edit message"><Icon name="tb-pencil" size={15} /></ActionBarPrimitive.Edit>
-      </ActionBarPrimitive.Root>
       <div className="as-msg as-user"><MessagePrimitive.Parts /></div>
     </div>
   </MessagePrimitive.Root>

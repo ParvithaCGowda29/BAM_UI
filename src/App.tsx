@@ -15,8 +15,7 @@ import * as Step4 from './steps/Step4'
 import { Connectors, FileDetail, IngestReviewFooter, handedOn, IngestionReview, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
 import { StandardizeFooter, StandardizeView } from './steps/Standardize'
 import { UploadCount, UploadMenu, useUploadRows } from './steps/UploadPanes'
-import { GoalFooter } from './steps/GoalPanes'
-import { showsDraft, useGoal } from './lib/goal.ts'
+import { goalStage, useGoal } from './lib/goal.ts'
 import { MastersPage, UsagePage } from './steps/Global'
 import { ReleasePrep, SkillReview } from './steps/Review'
 import { SCREEN_ROUTES, STEP_SCREEN, globalByPath, screenByPath, screenLabel, stageOf } from './tracker/trackerConfig.ts'
@@ -199,6 +198,7 @@ function Workbench() {
     <div className="app" data-env={env}>
       <a className="skip" href="#ws-title">Skip to screen content</a>
       <TopBar snap={snap} syncedAt={syncedAt} offline={!!error} />
+      <UploadStage snap={snap} on={screen?.id === '1.1'} />
       <div className="shell" data-screen={screen?.id} data-nav={shell.nav ? 'collapsed' : undefined} data-assist={shell.assistant ? 'collapsed' : undefined} data-drawer={drawer ?? undefined}>
         <div className="shell-slot slot-nav"><NavRail snap={snap} /></div>
         {/* Mounted once for the session (never keyed by screen), so the conversation survives navigation. */}
@@ -220,14 +220,21 @@ function Workbench() {
   )
 }
 
-// Upload's right pane is the goal's ISATVON draft until it is approved, then Uploaded files (29 Oct 2026).
-const useDraftShown = (snap: Snapshot) => { const n = useUploadRows(snap).length; return useGoal(s => showsDraft(s, n)) }
+// Upload's right pane (4 Nov 2026): Outputs. It is hidden until files are added (see useUploadStage).
 function UploadHead({ snap }: { snap: Snapshot }) {
-  return useDraftShown(snap)
-    ? <h2 id="ws-title" tabIndex={-1}><span className="ws-title up-title">Output</span><span className="up-count">ISATVON · Example draft</span></h2>
-    : <><h2 id="ws-title" tabIndex={-1}><span className="ws-title up-title">Uploaded files</span><UploadCount snap={snap} /></h2><UploadMenu snap={snap} /></>
+  return <><h2 id="ws-title" tabIndex={-1}><span className="ws-title up-title">Outputs</span><UploadCount snap={snap} /></h2><UploadMenu snap={snap} /></>
 }
-const UploadFoot = ({ snap }: { snap: Snapshot }) => useDraftShown(snap) ? <GoalFooter /> : <UploadFooter snap={snap} />
+const UploadFoot = ({ snap }: { snap: Snapshot }) => <UploadFooter snap={snap} />
+/** Pane progression on Upload: 1 = middle only, 2 = goal expanded (files pane opens), 3 = files added (outputs pane opens). */
+function UploadStage({ snap, on }: { snap: Snapshot; on: boolean }) {
+  const n = useUploadRows(snap).length, stage = useGoal(s => goalStage(s, n))
+  useEffect(() => {
+    const root = document.documentElement
+    if (on) root.dataset.uploadStage = String(stage); else delete root.dataset.uploadStage
+    return () => { delete root.dataset.uploadStage }
+  }, [on, stage])
+  return null
+}
 
 // The reason and the action come from the same prerequisite check, so they always agree.
 function LockedScreen({ id, info, snap }: { id: string; info: StepInfo; snap: Snapshot }) {

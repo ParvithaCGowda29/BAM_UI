@@ -417,9 +417,6 @@ export function Center({ snap, info }: StepProps) {
           <span className="muted sm kbd-hint">Double-click a cell or start typing to edit in place · Tab/Enter saves · Esc cancels · Enter on Skill expands · Shift+Enter shows SOW passage · Ctrl+Z undoes</span>
         </div>
         <div className="row">
-          {/* Edit: the existing grid edit control (in place editing; Reopen when the workflow has moved on). */}
-          <GateButton variant="secondary" icon="edit" {...tips('3.2', 'Edit')} reason={editReason}
-            onClick={() => info.editable ? document.querySelector<HTMLElement>('.grid-pane .ag-cell[col-id="instructions"]')?.focus() : setReopen(true)}>Edit</GateButton>
           <GateButton action="generate" {...tips('3.2', 'Approve')} reason={generateReason} busy={busy === 'Generate contract' || busy === 'Mark reviewed'} successKey={snap.workflow?.runId} onClick={startGenerate}>Approve</GateButton>
         </div>
       </>}>

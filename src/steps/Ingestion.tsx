@@ -194,12 +194,12 @@ export function UploadFooter({ snap }: { snap: Snapshot }) {
   const ready = rows.filter(r => r.state === 'ready').length
   // Locked until the goal is approved (approval gate): the footer says how to unlock Add files.
   const locked = !useGoal(canAddFiles)
-  const status = locked && !rows.length ? 'Expand and approve the goal to unlock Add files.' : !rows.length ? 'Add files to continue' : progress ? `${progress.done} of ${progress.total} uploaded` : busy ? 'Checking the uploaded files' : !ready ? 'No file is ready yet' : 'Ready to start'
+  const status = locked && !rows.length ? 'Send your goal to unlock Add files.' : !rows.length ? 'Add files to continue' : progress ? `${progress.done} of ${progress.total} uploaded` : busy ? 'Checking the uploaded files' : !ready ? 'No file is ready yet' : 'Ready to start'
   const t = tips('1.1', 'Start')
   return <div className="ws-foot-in" role="status" aria-live="polite">
     <div className="ws-foot-text">{progress ? <UploadProgress {...progress} /> : <span className="muted sm">{status}</span>}</div>
     <Tip text={t.tip} note={status !== 'Ready to start' ? status : undefined}>
-      <button className="btn btn-primary" aria-disabled={status !== 'Ready to start' || undefined} onClick={() => { if (status === 'Ready to start') goScreen('1.8') }}>Start</button></Tip>
+      <button className="btn btn-primary" aria-disabled={status !== 'Ready to start' || undefined} onClick={() => { if (status === 'Ready to start') goScreen('1.8') }}>Start ingestion</button></Tip>
   </div>
 }
 /** Parse is automated: status only; it opens Review when the extraction is done. A failure shows Retry. */
@@ -218,7 +218,6 @@ export function IngestReviewFooter({ snap }: { snap: Snapshot }) {
   const rag = useRag(s => s)
   const parsed = !!snap.ingestion && rag.steps.find(x => x.key === 'extract')?.status === 'done'
   return <Foot title={parsed ? 'Accepted, parsed files only' : 'Waiting for parsed files'} line="Context receives the accepted, parsed files">
-    <GateButton variant="secondary" icon="edit" {...tips('1.4', 'Edit')} reason={snap.steps[0].editable ? undefined : 'Reopen Scope to change the intake batch'} onClick={() => goScreen('1.1')}>Edit</GateButton>
     <GateButton icon="tb-clipboard-check" {...tips('1.4', 'Approve')} reason={parsed ? undefined : 'Parsing must finish first'} onClick={() => goScreen('2.5')}>Approve</GateButton></Foot>
 }
 

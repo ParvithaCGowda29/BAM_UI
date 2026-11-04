@@ -17,17 +17,17 @@
 .rg-insp { position: absolute; right: 10px; bottom: 10px; z-index: 6; width: 250px; max-height: calc(100% - 20px); overflow: auto; display: flex; flex-direction: column; gap: 6px;
   padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
 .rg-insp header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rg-search { min-height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12.5px; }
+.rg-search { min-height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12px; }
 .rg-rels { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-.rg-rels li { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; overflow-wrap: anywhere; }
+.rg-rels li { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; overflow-wrap: anywhere; }
 
 /* Schemas */
 .rs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.rs-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--text); }
+.rs-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text); }
 .rs-chip[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .rs-chip .icon { color: var(--ok); }
 .rs-title { display: flex; align-items: center; gap: 8px; }
-.rs-title strong { font-size: 15px; }
+.rs-title strong { font-size: 14px; }
 .rs-actions { margin-left: auto; display: inline-flex; gap: 6px; }
 .rs-code { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font: 12.5px/1.6 'JetBrains Mono', ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
 .rs-edit { width: 100%; min-height: 220px; resize: vertical; }
@@ -41,11 +41,11 @@
 .rq-bar > i { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text); }
 
 /* RAG review */
-.rr-h { font-size: 15px; font-weight: 700; }
+.rr-h { font-size: 14px; font-weight: 700; }
 .rr-warn { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--warn); background: var(--warn-soft); }
 .rr-warn > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .rr-warn > .icon { color: var(--warn); flex: none; }
-.rr-show { margin-left: auto; color: var(--muted); font-size: 12.5px; }
+.rr-show { margin-left: auto; color: var(--muted); font-size: 12px; }
 .dc-rows details[open] .rr-show { visibility: hidden; }
 .rr-body { padding: 0 14px 12px; }
 .rr-body .rag-card { border: 0; padding: 0; }
@@ -54,21 +54,21 @@
 /* Context quality, Questions only (15 Oct 2026): the list scrolls, never the pane or the pinned footer. */
 .ws-body > .rag:has(> .cq) { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
 .cq { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.cq-h { margin: 2px 0 0; font-size: 12.5px; font-weight: 700; display: flex; gap: 8px; }
+.cq-h { margin: 2px 0 0; font-size: 12px; font-weight: 700; display: flex; gap: 8px; }
 .cq-h .muted { font-weight: 400; }
 .cq-list { flex: 1; min-height: 0; overflow: auto; list-style: none; margin: 0; padding: 0 2px 2px; display: flex; flex-direction: column; gap: 6px; }
 .cq-row { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
 .cq-row.is-running { border-color: var(--accent); }
 .cq-row.is-flagged { border-color: var(--err); }
-.cq-kind { flex: none; min-width: 58px; padding: 1px 8px; border: 1px solid var(--border-strong); border-radius: 99px; font-size: 11px; color: var(--muted); text-align: center; }
+.cq-kind { flex: none; min-width: 58px; padding: 1px 8px; border: 1px solid var(--border-strong); border-radius: 99px; font-size: 12px; color: var(--muted); text-align: center; }
 .cq-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.cq-q { font-size: 13px; overflow-wrap: anywhere; }
+.cq-q { font-size: 14px; overflow-wrap: anywhere; }
 .cq-row .dc-pill { gap: 4px; }
 .cq-row .dc-pill:not([class*="tone-"]) { color: var(--muted); }
 /* Assistant thread on Context quality (same store as the list). */
 .as-q { display: flex; align-items: flex-start; gap: 8px; }
 .as-q > .icon { margin-top: 3px; flex: none; color: var(--accent); }
-.as-src { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 11.5px; white-space: normal; }
+.as-src { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 12px; white-space: normal; }
 .as-msg.as-fail { border: 1px solid var(--err); }
 .as-wait { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .assist[data-screen="2.3"] .as-msg > p, .assist[data-screen="1.1"] .as-msg > p { margin: 0; }
@@ -82,7 +82,7 @@
 .cq-ef { display: grid; gap: 8px; margin: 0; }
 .cq-ef > div { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
 .cq-ef dt { font-size: 12px; font-weight: 700; color: var(--muted); }
-.cq-ef dd { margin: 2px 0 0; font-size: 13px; }
+.cq-ef dd { margin: 2px 0 0; font-size: 14px; }
 .cq-detail-actions { justify-content: flex-end; gap: 10px; margin-top: auto; }
 
 /* Template: progress while the check activities run, and the read-only manifest. */
@@ -94,7 +94,7 @@
 @media (prefers-reduced-motion: reduce) { .tpl-progress > span { transition: none; } }
 /* Verify: Needs attention, pinned under the stat cards (23 Oct 2026). Scrolls inside past ~45% so the list stays visible. */
 .cq-na { flex: none; max-height: min(45%, 360px); overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); border-radius: 12px; background: var(--err-soft); }
-.cq-na-h { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 700; color: var(--err); }
+.cq-na-h { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; font-weight: 700; color: var(--err); }
 .cq-na-card { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--err) 35%, var(--border)); border-radius: 10px; background: var(--surface); scroll-margin: 10px; }
 .cq-na-card p { margin: 0; overflow-wrap: anywhere; }
 .cq-na-card .cq-ef { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }

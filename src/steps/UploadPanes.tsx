@@ -15,8 +15,7 @@ import { useAction } from '../lib/data'
 import { Confirm, Icon, Tip } from '../components/ui'
 import { fdeView } from './IngestionFlow'
 import { UploadIdle } from './UploadIdle'
-import { GoalOutput } from './GoalPanes'
-import { addFilesLocked, canAddFiles, resetGoal, showsDraft, useGoal } from '../lib/goal.ts'
+import { addFilesLocked, canAddFiles, flowLine, resetGoal, useGoal } from '../lib/goal.ts'
 import { useReviewFiles } from './Standardize'
 
 // ---- entry points --------------------------------------------------------------------------------------------
@@ -119,14 +118,14 @@ export function phaseOf(rows: UpRow[], drag: boolean): Phase {
 export function UploadFilesBlock({ snap }: { snap: Snapshot }) {
   const uploadsClosed = !snap.steps[0].editable
   // Goal flow (29 Oct 2026, approval gate): locked until the goal draft is approved; then highlighted until files arrive.
-  const open = useGoal(canAddFiles), approved = useGoal(s => s.approved)
+  const open = useGoal(canAddFiles), approved = open
   const added = fileCounts(useUploadRows(snap)).totalFiles > 0
   const closed = uploadsClosed || !open
   // The file list lives only in the right pane's results table (per user, 16 Oct 2026); the left keeps the entry point.
   return (
     <section className="up-left" aria-label="Add source files" {...dropTarget(closed)}>
       <AddFilesMenu closed={closed} cue={approved && !added && !closed} hint={!uploadsClosed && !open ? 'up-add-hint' : undefined} />
-      <p className="muted xs" id="up-add-hint">{uploadsClosed ? 'Uploads are closed while the SOW is approved. Reopen Scope to add documents.' : !open ? 'Approve the goal first.' : HELPER}</p>
+      <p className="muted xs" id="up-add-hint">{uploadsClosed ? 'Uploads are closed while the SOW is approved. Reopen Scope to add documents.' : !open ? 'Send your goal first.' : HELPER}</p>
     </section>
   )
 }
@@ -245,7 +244,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
   const rows = all.filter(isAdded), failed = all.filter(r => r.state === 'failed')
   const review = useReviewFiles(snap).ids
   const objective = useUi(s => (s.fdeGoals ?? '').trim())
-  const draft = useGoal(s => showsDraft(s, all.length))
+  const flow = useGoal(s => (s.draft ? flowLine(s.draft.goal) : ''))
   const { busy: acting, run } = useAction()
   const closed = !snap.steps[0].editable
   const busy = rows.some(r => r.state === 'uploading' || r.state === 'checking')
@@ -263,8 +262,6 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
   const had = useRef(all.length > 0)
   useEffect(() => { const has = all.length > 0; if (has && !had.current) setLeaving(true); had.current = has }, [all.length])
   useEffect(() => { if (!leaving) return; const t = setTimeout(() => setLeaving(false), 300); return () => clearTimeout(t) }, [leaving])
-  // The goal's ISATVON draft holds the pane until it is approved (GoalPanes.tsx).
-  if (draft) return <GoalOutput snap={snap} />
   if (!all.length) return (
     <main className="up-right" aria-labelledby="center-title">
       <h2 id="center-title" className="sr-only" tabIndex={-1}>Uploaded files</h2>
@@ -275,6 +272,8 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
     <main className="up-right" aria-labelledby="center-title">
       <h2 id="center-title" className="sr-only" tabIndex={-1}>Uploaded files</h2>
       {leaving && <UploadIdle leaving />}
+      <section className="up-instr up-flow" aria-label="Workflow"><span className="up-label">Workflow</span>
+        <p>{flow}</p><p className="muted">Ingestion results will appear here.</p></section>
       <section className="up-instr"><span className="up-label">Instructions</span>
         <p className={objective ? '' : 'muted'}>{objective || 'Your objective will appear here from the conversation.'}</p></section>
       {/* Failures first, each with its reason always visible and its fix (29 Oct 2026). */}

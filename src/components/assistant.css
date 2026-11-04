@@ -6,8 +6,8 @@
 /* Empty: greeting, sublines, composer and chips centred. */
 .assist .as-empty { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: var(--pad); text-align: center; }
 .assist .as-hello { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
-.assist .as-sub { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
-.assist .as-empty .as-msg { align-self: center; background: none; padding: 0; font-size: 12.5px; color: var(--muted); }
+.assist .as-sub { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.assist .as-empty .as-msg { align-self: center; background: none; padding: 0; font-size: 12px; color: var(--muted); }
 .assist .as-empty .as-compose { width: 100%; margin-top: 8px; padding: 0; }
 
 /* Composer: rounded field with + on the left, dictate and send / stop on the right, inside it. */
@@ -30,7 +30,7 @@
 .assist .as-file > .icon { flex: none; color: var(--accent); }
 .assist .as-file-meta { display: flex; flex-direction: column; min-width: 0; font-size: 12px; }
 .assist .as-file-meta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-.assist .as-file-meta span { color: var(--muted); font-size: 11px; }
+.assist .as-file-meta span { color: var(--muted); font-size: 12px; }
 .assist .as-file-x { flex: none; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .assist .as-file-x:hover { background: var(--surface-3); color: var(--text); }
 
@@ -50,9 +50,9 @@
 .assist .as-sent-file { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12px; color: var(--text); }
 .assist .as-sent-file .icon { color: var(--accent); }
 .assist .as-arow { align-self: stretch; display: flex; align-items: flex-start; gap: 10px; }
-.assist .as-avatar { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #0084C2; color: #fff; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; margin-top: 1px; }
+.assist .as-avatar { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #0084C2; color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; margin-top: 1px; }
 .assist .as-abody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.assist .as-arow .as-msg.as-bot { max-width: 100%; background: none; border: 0; border-radius: 0; padding: 0; font-size: 13.5px; }
+.assist .as-arow .as-msg.as-bot { max-width: 100%; background: none; border: 0; border-radius: 0; padding: 0; font-size: 14px; }
 .assist .as-arow .as-msg.as-bot.as-fail { border-left: 3px solid var(--err); padding-left: 10px; }
 .assist .as-msg.as-bot p { margin: 0; }
 .assist .as-caret { content: ''; display: inline-block; width: 8px; height: 1.05em; margin-left: 2px; vertical-align: text-bottom; background: var(--accent); animation: as-caret 1s steps(1) infinite; }
@@ -63,10 +63,10 @@
 .assist .as-ibtn:hover { background: var(--surface-3); color: var(--text); }
 .assist .as-ibtn[data-submitted] { color: var(--accent); }
 .assist .as-ibtn:disabled { opacity: .4; cursor: not-allowed; }
-.assist .as-helper { margin: 0; font-size: 11.5px; color: var(--faint); }
+.assist .as-helper { margin: 0; font-size: 12px; color: var(--faint); }
 
 /* Generating indicator. */
-.assist .as-gen { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.assist .as-gen { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .assist .as-dots { display: inline-flex; gap: 3px; }
 .assist .as-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: as-dot 1.2s ease-in-out infinite; }
 .assist .as-dots i:nth-child(2) { animation-delay: .15s; } .assist .as-dots i:nth-child(3) { animation-delay: .3s; }
@@ -74,7 +74,7 @@
 
 /* Edit and resend. */
 .assist .as-edit { align-self: flex-end; width: min(100%, 88%); display: flex; flex-direction: column; gap: 8px; }
-.assist .as-edit-input { width: 100%; min-height: 72px; resize: vertical; padding: 10px 14px; border: 1.5px solid var(--accent); border-radius: 14px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; line-height: 1.5; }
+.assist .as-edit-input { width: 100%; min-height: 72px; resize: vertical; padding: 10px 14px; border: 1.5px solid var(--accent); border-radius: 14px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; line-height: 1.5; }
 .assist .as-edit-input:focus-visible { outline: none; box-shadow: var(--focus); }
 .assist .as-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .assist .as-pill { min-height: 30px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -105,7 +105,7 @@
 
 /* Suggestions directly above the chatbox, captioned (29 Oct 2026, output-specific chips). */
 .assist .as-sugwrap { display: flex; flex-direction: column; gap: 6px; }
-.assist .as-sugcap { font-size: 11.5px; font-weight: 600; color: var(--muted); text-align: left; }
+.assist .as-sugcap { font-size: 12px; font-weight: 600; color: var(--muted); text-align: left; }
 .assist .as-sugwrap .as-sugs { justify-content: flex-start; }
 .assist .as-empty .as-sugwrap .as-sugs { justify-content: center; }
 .assist .as-empty .as-sugcap { text-align: center; }
