@@ -186,19 +186,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
     runtime.thread.import(threads.get(project) ?? { messages: [] })
     shownProject.current = project
   }, [project, runtime])
-  // Upload acknowledgment (lock-fix prompt, 29 Oct 2026; replaces the long summary): one short "Files added." per
-  // finished batch that added at least one file. A batch counts as finished when nothing is still uploading; the files
-  // it added are the ones never acknowledged before (per project, by record id), so replace / discard / retry counts,
-  // re-renders and remounts never repost it. Failures post nothing: the files panel holds every count and reason.
-  const settled = !uploadRows.some(r => r.state === 'uploading')
-  const addedIds = uploadRows.filter(r => r.state !== 'failed' && r.state !== 'uploading').map(r => r.id).join(',')
-  useEffect(() => {
-    if (!settled || !addedIds) return
-    const acked = ackedFor(project), fresh = addedIds.split(',').filter(id => !acked.has(id))
-    if (!fresh.length) return
-    fresh.forEach(id => acked.add(id))
-    void runtime.thread.append({ role: 'assistant', content: [{ type: 'text', text: 'Files added.' }], metadata: { custom: { event: 'files-added' } } })
-  }, [settled, addedIds, project, runtime])
+  // Upload progress and "files added" are not posted in chat (4 Nov 2026): the files and outputs panes hold every count and reason.
   // A reply is streaming: stage events wait until it finishes, so they land after it, in order.
   const replying = useSyncExternalStore(cb => runtime.thread.subscribe(cb), () => runtime.thread.getState().isRunning)
   const post = (key: string, text: string) => {

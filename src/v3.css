@@ -289,7 +289,12 @@
 
 /* ---- Upload pane progression (4 Nov 2026): middle only -> + files pane -> + outputs pane ---- */
 html[data-upload-stage="1"] .shell[data-screen="1.1"] .workspace,
-html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace { display: none; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace {
+  /* Collapsed, not display:none, so the review dialog (a top-layer <dialog> inside this pane) can still open from the files pane. */
+  position: absolute; width: 0; height: 0; min-width: 0; margin: 0; padding: 0; border: 0; overflow: hidden; visibility: hidden; pointer-events: none;
+}
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .workspace dialog,
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace dialog { visibility: visible; pointer-events: auto; }
 @media (min-width: 861px) {
   html[data-upload-stage="1"] .shell[data-screen="1.1"] { grid-template-columns: minmax(0, 1fr); }
   html[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-nav { display: none; }

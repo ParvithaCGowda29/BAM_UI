@@ -40,7 +40,7 @@ export function sendGoal(raw: string) {
   if (!text) return
   const goal = parseGoal(text)
   setGoal({ goal, text, draft: expandGoal(goal), approved: true })
-  setUi({ fdeGoals: /^build an ai agent/i.test(text) ? text : GOAL_PREFIX + text.charAt(0).toLowerCase() + text.slice(1) })
+  setUi({ fdeGoals: /^build an ai agent/i.test(text) ? text : GOAL_PREFIX + (/^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text) })
 }
 
 /** Middle pane on Upload while the thread is empty and no goal is expanded yet. */
