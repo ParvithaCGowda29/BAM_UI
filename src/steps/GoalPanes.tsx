@@ -55,6 +55,8 @@ export function GoalCapture() {
   // Fresh entry with a saved goal: the box starts with that goal instead, so Enter continues the saved project.
   const [value, setValue] = useState(() => atGoalEntry() ? entryText() : GOAL_PREFIX)
   const [focus, setFocus] = useState(false)
+  const [exit, setExit] = useState(false)
+  const leaving = useRef(false)
   const ta = useRef<HTMLTextAreaElement>(null)
   // The examples cycle after the fixed phrase until the person types; they stop then and never write into the box.
   const example = useMarquee(value === GOAL_PREFIX)
@@ -66,10 +68,16 @@ export function GoalCapture() {
     if (empty) return
     // Fresh entry, saved goal sent unchanged: continue the saved draft as is - never re-expand it (in-place edits survive).
     if (atGoalEntry() && getGoal().draft && value.trim() === entryText()) { continueGoal(); return }
-    sendGoal(value)
-    continueGoal()
+    // Fade & Settle (5 Nov 2026, option A): the hero and card ease out for 350ms before the workspace takes over,
+    // so nothing vanishes in a hard cut. Reduced motion skips the wait.
+    if (leaving.current) return
+    leaving.current = true
+    const go = () => { sendGoal(value); continueGoal(); setExit(false); leaving.current = false }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { go(); return }
+    setExit(true)
+    setTimeout(go, 350)
   }
-  return <div className="goal">
+  return <div className={`goal${exit ? ' goal-exit' : ''}`}>
     <h3 className="goal-head">Name the agent and let the <img src={bull} alt="BuLLM" className="goal-bull" /> build it</h3>
     <p className="goal-lede">Type the goal. BuLL does the rest.</p>
     <div className="goal-box">

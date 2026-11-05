@@ -198,3 +198,29 @@ html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-send { width: 40px; 
 @media (max-width: 900px) {
   html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-head { font-size: 30px; white-space: normal; }
 }
+
+/* ---- Transition: Fade & Settle (5 Nov 2026, option A chosen by the user) -------------------------------------------
+   Start screen to workspace, ~1.3s in all. The hero and goal card ease out first (.goal-exit, GoalCapture waits 350ms);
+   then the chrome fades in staggered, the pane background fades, and the chat content rises in. CSS only, so state and
+   behaviour are untouched; animations start when the stage-2 rules begin to match. Both themes share the motion. */
+@keyframes fs-hero-out { to { opacity: 0; transform: translateY(-16px); } }
+@keyframes fs-card-out { to { opacity: 0; transform: translateY(28px) scale(.985); } }
+@keyframes fs-from-top { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes fs-from-left { from { opacity: 0; transform: translateX(-12px); } }
+@keyframes fs-fade { from { opacity: 0; } }
+@keyframes fs-rise { from { opacity: 0; transform: translateY(8px); } }
+.goal-exit .goal-head, .goal-exit .goal-lede { animation: fs-hero-out 350ms cubic-bezier(.65,0,.35,1) forwards; }
+.goal-exit .goal-box { animation: fs-card-out 450ms cubic-bezier(.65,0,.35,1) 100ms forwards; pointer-events: none; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-nav { animation: fs-from-left 500ms cubic-bezier(.33,1,.68,1) 100ms both; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist .assist { animation: fs-fade 500ms cubic-bezier(.33,1,.68,1) both; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > * { animation: fs-rise 420ms cubic-bezier(.33,1,.68,1) both; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(1) { animation-delay: 450ms; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(2) { animation-delay: 570ms; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(n+3) { animation-delay: 690ms; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-compose { animation: fs-rise 420ms cubic-bezier(.33,1,.68,1) 700ms both; }
+html[data-upload-stage="2"] .app > header:first-of-type, html[data-upload-stage="2"] .topbar { animation: fs-from-top 400ms cubic-bezier(.33,1,.68,1) 50ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .goal-exit .goal-head, .goal-exit .goal-lede, .goal-exit .goal-box,
+  html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-nav, html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist .assist,
+  html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > *, html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-compose { animation: none; }
+}
