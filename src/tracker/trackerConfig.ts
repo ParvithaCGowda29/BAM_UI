@@ -77,10 +77,10 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   screen('3.4', '3', 'Release prep', 'checklist', '/workbench/release', 'Manifest version, release prerequisites and version history.', { hidden: true, navAs: '4.3' }),
 
   stage('4', 'Validation', 'tb-shield-check', 'Run the isolated sandbox, check the results, certify the checked artifact and commit it to BAM_db.'),
-  screen('4.8', '4', 'Sandbox', 'tb-box', '/validation/sandbox', 'Create and run the isolated validation environment.', { step: 4 }),
-  screen('4.4', '4', 'Check', 'tb-list-check', '/sandbox/results', 'Validation results and evidence for the current artifact.', { step: 4 }),
+  screen('4.8', '4', 'Sandbox', 'tb-box', '/validation/sandbox', 'Create and run the isolated validation environment.', { step: 4, mode: 'hitl' }),
+  screen('4.4', '4', 'Check', 'tb-list-check', '/sandbox/results', 'Validation results and evidence for the current artifact.', { step: 4, mode: 'hitl' }),
   screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Record approval of the checked artifact. Commit comes next.', { step: 4, mode: 'hitl' }),
-  screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Save the certified artifact to BAM_db, then deploy it to Staging.', { step: 4 }),
+  screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Save the certified artifact to BAM_db, then deploy it to Staging.', { step: 4, mode: 'hitl' }),
   screen('4.1', '4', 'Validation activities', 'circle-check', '/workbench/validation', 'Check activities A–D with attempt history and findings.', { step: 3, hidden: true, navAs: '4.4' }),
   screen('4.7', '4', 'Staging complete', 'rocket', '/sandbox/staging', 'What is live on Staging. Staging complete never means production.', { step: 4, hidden: true, navAs: '4.6' }),
 ]

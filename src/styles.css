@@ -295,6 +295,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding: 10px 16px; border-top: 1px solid var(--border); background: var(--surface-2);
 }
 .foot-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 240px; }
+/* Action buttons always sit in the pane's bottom-right corner, even when the footer wraps on a narrow pane (per user, 5 Nov 2026). */
+.pane-foot > .row { margin-left: auto; }
 .section { display: flex; flex-direction: column; gap: 8px; }
 .section-head { display: flex; align-items: center; justify-content: space-between; }
 .section h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
