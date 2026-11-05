@@ -481,10 +481,12 @@ function QaPair({ q }: { q: Row }) {
 function QualityProgress() {
   const rows = useChecks() as Row[]
   const run = useRunState()
-  if (!run.running) return null
+  // The sample results stay in the chat after the run finishes (5 Nov 2026 fix): they used to vanish the moment it ended.
+  // They go only when the upstream changes and every row is reset to Untested (phase back to idle).
+  if (run.phase === 'idle') return null
   const inRun = run.order.map(id => rows.find(r => r.id === id)).filter((r): r is Row => !!r)
   return <>
-    <div className="as-msg as-bot" role="status">Running the sample set. {inRun.filter(r => r.status === 'passed' || r.status === 'flagged').length} of {inRun.length} answered.</div>
+    <div className="as-msg as-bot" role="status">{run.running ? 'Running' : 'Ran'} the sample set. {inRun.filter(r => r.status === 'passed' || r.status === 'flagged').length} of {inRun.length} answered.</div>
     {inRun.filter(r => r.status !== 'pending').map(q => <QaPair key={q.id} q={q} />)}
   </>
 }
