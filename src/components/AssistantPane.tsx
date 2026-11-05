@@ -32,7 +32,7 @@ import Orb from './reactbits/Orb'
 import bull from '../assets/login/bull-head-transparent.png'
 import { UploadMessages, fileCounts, useUploadRows } from '../steps/UploadPanes'
 import { GoalCapture, GoalExpansion } from '../steps/GoalPanes'
-import { applyEdit, conversationChips, draftReply, getGoal, setGoal, useGoal, type Draft } from '../lib/goal.ts'
+import { applyEdit, atGoalEntry, conversationChips, draftReply, getGoal, setGoal, useGoal, type Draft } from '../lib/goal.ts'
 
 
 const dictation = createDictation()
@@ -244,6 +244,10 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
   const chips = useMemo(() => !chipDraft || running ? [] : conversationChips(chipDraft, names ? names.split('\u0000') : [], since > 0 ? sentAll[sentAll.length - 1] : null),
     [chipDraft, running, names, since, userTexts])
   const hasDraft = useGoal(s => !!s.draft)
+  // Fresh entry (5 Nov 2026): a revived saved goal shows the goal capture first, not the expanded draft; once files
+  // are in the upload list the project is underway and the draft shows as before (same count goalStage uses).
+  const entryFlag = useGoal(() => atGoalEntry()), entryRows = useUploadRows(snap)
+  const atEntry = entryFlag && !entryRows.length
   const composer = <Composer capture={capture} chips={chips} />
   // The first message: the idle Orb and greeting fade out over the conversation as it fades in (~300ms, no snap).
   const [leaving, setLeaving] = useState(false)
@@ -256,7 +260,7 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
       <ComposerPrimitive.AttachmentDropzone className="as-dropzone">
         {/* Upload, nothing said yet: the goal capture (29 Oct 2026) in place of the greeting. */}
         {empty && screenId === '1.1' ? <>
-          <div className="as-viewport">{hasDraft ? <GoalExpansion /> : <GoalCapture />}</div>
+          <div className="as-viewport">{hasDraft && !atEntry ? <GoalExpansion /> : <GoalCapture />}</div>
           {composer}
         </> : empty ? <div className="as-empty">
           <IdleOrb />
@@ -269,7 +273,7 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
           {/* One persistent list: stage updates are messages in it (never a replaced note). Only live progress
               (a Verify run in flight, uploads in flight) sits after the messages until it finishes. */}
           <ThreadPrimitive.Viewport className={`as-viewport${leaving ? ' as-fade-in' : ''}`}>
-            {screenId === '1.1' && hasDraft && <GoalExpansion />}
+            {screenId === '1.1' && hasDraft && !atEntry && <GoalExpansion />}
             <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage, EditComposer }} />
             {screenId === '2.3' && <QualityProgress />}
             {/* Scrolled up to read history: a cue back to the newest message (assistant-ui disables it at the bottom). */}

@@ -251,6 +251,12 @@ export function setGoal(patch: Partial<GoalState> | ((s: GoalState) => Partial<G
 }
 export const getGoal = () => gs
 export const resetGoal = () => setGoal({ goal: EXAMPLE, draft: null, approved: false, text: '' })
+/** Fresh entry (5 Nov 2026, per user): a (re)load that revives a saved goal starts at the single-pane goal entry
+ *  with the saved goal pre-filled, and Enter continues the saved draft untouched (in-place edits survive).
+ *  Session-scoped only - nothing is cleared from storage. Once files are uploaded the views skip the entry. */
+let entry = !!gs.draft
+export const atGoalEntry = () => entry && !!gs.draft
+export function continueGoal() { if (!entry) return; entry = false; gsubs.forEach(f => f()) }
 export const useGoal = <T,>(select: (s: GoalState) => T) =>
   useSyncExternalStore(cb => { gsubs.add(cb); return () => { gsubs.delete(cb) } }, () => select(gs))
 /** "+ Add files" (4 Nov 2026, no approval gate): opens as soon as the goal is expanded into a draft. */
@@ -261,7 +267,7 @@ export const addFilesLocked = () => !canAddFiles(getGoal())
 export const showsDraft = (_s: GoalState, _files: number) => false
 
 /** Pane progression (4 Nov 2026): 1 = middle pane only, 2 = goal expanded (files pane opens), 3 = files added (outputs pane opens). */
-export const goalStage = (s: GoalState, files: number): 1 | 2 | 3 => !s.draft ? 1 : files > 0 ? 3 : 2
+export const goalStage = (s: GoalState, files: number): 1 | 2 | 3 => !s.draft ? 1 : files > 0 ? 3 : atGoalEntry() ? 1 : 2
 
 /** Splits a typed goal "<what> for <who> in <where>" into the three parts the profile reads. Free-form text is valid:
  *  parts that are not written fall back to neutral wording, and the whole text stays the What. */

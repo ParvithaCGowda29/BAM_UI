@@ -7,7 +7,7 @@
 import './goal.css'
 import { useEffect, useRef, useState } from 'react'
 import { setUi } from '../lib/store'
-import { KEYS, SECTION, expandGoal, parseGoal, plain, setGoal, useGoal } from '../lib/goal.ts'
+import { KEYS, SECTION, atGoalEntry, continueGoal, expandGoal, getGoal, parseGoal, plain, setGoal, useGoal } from '../lib/goal.ts'
 import { Icon } from '../components/ui'
 import bull from '../assets/login/bull-head-transparent.png'
 
@@ -45,11 +45,15 @@ export function sendGoal(raw: string) {
   setUi({ fdeGoals: /^build an ai agent/i.test(text) ? text : GOAL_PREFIX + (/^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text) })
 }
 
+/** The saved goal normalized for the entry box, prefixed the way sendGoal's fdeGoals line does it. */
+const entryText = () => { const t = getGoal().text ?? ''; return !t || t.startsWith(GOAL_PREFIX) ? t || GOAL_PREFIX : GOAL_PREFIX + (/^[A-Z][a-z]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t) }
+
 /** Middle pane on Upload while the thread is empty and no goal is expanded yet. */
 export function GoalCapture() {
   const PLEN = GOAL_PREFIX.length
   // The box starts with the fixed phrase as real text; the caret starts right after it (5 Nov 2026) and never goes inside it.
-  const [value, setValue] = useState(GOAL_PREFIX)
+  // Fresh entry with a saved goal: the box starts with that goal instead, so Enter continues the saved project.
+  const [value, setValue] = useState(() => atGoalEntry() ? entryText() : GOAL_PREFIX)
   const [focus, setFocus] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
   // The examples cycle after the fixed phrase until the person types; they stop then and never write into the box.
@@ -58,7 +62,13 @@ export function GoalCapture() {
   useEffect(() => { const e = ta.current; if (e) { e.style.height = 'auto'; e.style.height = `${Math.min(e.scrollHeight, 160)}px` } }, [value])
   const typed = value.slice(PLEN)
   const empty = !typed.trim()
-  const send = () => { if (!empty) sendGoal(value) }
+  const send = () => {
+    if (empty) return
+    // Fresh entry, saved goal sent unchanged: continue the saved draft as is - never re-expand it (in-place edits survive).
+    if (atGoalEntry() && getGoal().draft && value.trim() === entryText()) { continueGoal(); return }
+    sendGoal(value)
+    continueGoal()
+  }
   return <div className="goal">
     <h3 className="goal-head">Name the agent and let the <img src={bull} alt="BuLLM" className="goal-bull" /> build it</h3>
     <p className="goal-lede">Type the goal. BuLL does the rest.</p>
