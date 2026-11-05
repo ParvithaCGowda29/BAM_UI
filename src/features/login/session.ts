@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { navigate } from '../../lib/route'
 
 // Signed-in session: only the user's email, in sessionStorage (localStorage when "Keep me signed in" is ticked).
 // Never a password or token. Production builds have no auth backend yet, so no session is ever read (fails closed).
@@ -32,8 +33,10 @@ function clear() {
   email = null
 }
 
-/** Profile menu Sign out; the App gate then shows /login (no banner). */
+/** Profile menu Sign out: a fresh start, so bare /login with no ?next - signing back in opens the live staged
+    flow (the gate's ?next restore stays for forced session loss, where returning to the same screen is wanted). */
 export function signOut() {
+  navigate('/login', { replace: true })
   clear()
   subs.forEach(f => f())
 }
