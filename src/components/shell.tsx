@@ -66,7 +66,7 @@ export function TopBar({ syncedAt, offline }: { snap?: Snapshot; syncedAt: numbe
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
         </button>
         <ProfileMenu />
-        <button className="icon-btn assist-drawer-btn" onClick={() => setUi(s => ({ drawer: s.drawer === 'assistant' ? null : 'assistant' }))} aria-label="Open Enterprise Assistant" title="Enterprise Assistant"><Icon name="sparkle" /></button>
+        <button className="icon-btn assist-drawer-btn" onClick={() => setUi(s => ({ drawer: s.drawer === 'assistant' ? null : 'assistant' }))} aria-label="Open BuLLM Assistant" title="BuLLM Assistant"><Icon name="sparkle" /></button>
       </div>
       <AppSettingsModal />
     </header>

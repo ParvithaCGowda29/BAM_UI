@@ -202,7 +202,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
   // the thread keeps its messages and background posts (the upload summary) still reach it while the pane is hidden.
   if (collapsed) return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <aside className="shell-pane shell-rail" aria-label="Enterprise Assistant">
+      <aside className="shell-pane shell-rail" aria-label="BuLLM Assistant">
         <button className="rail-show" onClick={toggle} aria-expanded={false} aria-label="Show assistant">
           <Icon name="panel-right" size={16} /><span>Show assistant</span>
         </button>
@@ -214,7 +214,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
     <ConfirmCtx.Provider value={pending}>
       <aside className="shell-pane assist" aria-labelledby="assist-title" data-screen={screenId}>
         <header className="shell-head">
-          <h2 id="assist-title"><Icon name="sparkle" size={13} />Enterprise Assistant{goalState && <span className="as-state">{goalState}</span>}</h2>
+          <h2 id="assist-title"><Icon name="sparkle" size={13} />BuLLM Assistant{goalState && <span className="as-state">{goalState}</span>}</h2>
           <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant"><Icon name="panel-left" size={14} />Hide assistant</button>
         </header>
         <ScreenCtx.Provider value={screenId}>
