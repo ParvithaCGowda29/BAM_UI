@@ -32,7 +32,7 @@ import Orb from './reactbits/Orb'
 import bull from '../assets/login/bull-head-transparent.png'
 import { UploadMessages, fileCounts, useUploadRows } from '../steps/UploadPanes'
 import { GoalCapture, GoalExpansion } from '../steps/GoalPanes'
-import { applyEdit, atGoalEntry, conversationChips, draftReply, getGoal, setGoal, useGoal, type Draft } from '../lib/goal.ts'
+import { applyEdit, atGoalEntry, continueGoal, conversationChips, draftReply, getGoal, setGoal, useGoal, type Draft } from '../lib/goal.ts'
 
 
 const dictation = createDictation()
@@ -244,10 +244,10 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
   const chips = useMemo(() => !chipDraft || running ? [] : conversationChips(chipDraft, names ? names.split('\u0000') : [], since > 0 ? sentAll[sentAll.length - 1] : null),
     [chipDraft, running, names, since, userTexts])
   const hasDraft = useGoal(s => !!s.draft)
-  // Fresh entry (5 Nov 2026): a revived saved goal shows the goal capture first, not the expanded draft; once files
-  // are in the upload list the project is underway and the draft shows as before (same count goalStage uses).
-  const entryFlag = useGoal(() => atGoalEntry()), entryRows = useUploadRows(snap)
-  const atEntry = entryFlag && !entryRows.length
+  // Fresh entry (5 Nov 2026): a revived saved goal shows the goal capture first, not the expanded draft, whatever
+  // the project's progress; Enter (or the first question asked) continues the saved project as stored.
+  const atEntry = useGoal(() => atGoalEntry())
+  useEffect(() => { if (!empty) continueGoal() }, [empty]) // asking something from the fresh entry also continues the project
   const composer = <Composer capture={capture} chips={chips} />
   // The first message: the idle Orb and greeting fade out over the conversation as it fades in (~300ms, no snap).
   const [leaving, setLeaving] = useState(false)
