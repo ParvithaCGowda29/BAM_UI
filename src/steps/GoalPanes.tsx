@@ -1,6 +1,8 @@
 // Goal screen (4 Nov 2026, approved assistant redesign): one large typeable input with a cycling example as ghost text,
 // no dropdown sentence and no What / Who / Where cards. Sending the goal expands it into an ISATVON draft in the chat
 // (rows edit in place); that opens the files pane, and adding files opens the outputs pane. No approval step.
+// Caret fix (5 Nov 2026, screenshot): the fixed phrase "Build an AI agent that automates " is real text the box starts
+// with and the caret starts right after it; typing replaces the cycling example tail.
 // ponytail: the expansion is the rule-based mock in lib/goal.ts (no model/RAG is connected); swap expandGoal for the backend call.
 import './goal.css'
 import { useEffect, useRef, useState } from 'react'
@@ -45,23 +47,36 @@ export function sendGoal(raw: string) {
 
 /** Middle pane on Upload while the thread is empty and no goal is expanded yet. */
 export function GoalCapture() {
-  const [value, setValue] = useState('')
+  const PLEN = GOAL_PREFIX.length
+  // The box starts with the fixed phrase as real text; the caret starts right after it (5 Nov 2026) and never goes inside it.
+  const [value, setValue] = useState(GOAL_PREFIX)
   const [focus, setFocus] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
-  // The examples cycle while the box is empty (focused or not); the moment there is text they stop and never write into it.
-  const example = useMarquee(!value)
-  useEffect(() => { ta.current?.focus() }, []) // focus when the goal pane first appears
+  // The examples cycle after the fixed phrase until the person types; they stop then and never write into the box.
+  const example = useMarquee(value === GOAL_PREFIX)
+  useEffect(() => { const e = ta.current; if (e) { e.focus(); e.setSelectionRange(PLEN, PLEN) } }, []) // focus when the goal pane first appears
   useEffect(() => { const e = ta.current; if (e) { e.style.height = 'auto'; e.style.height = `${Math.min(e.scrollHeight, 160)}px` } }, [value])
-  const empty = !value.trim()
+  const typed = value.slice(PLEN)
+  const empty = !typed.trim()
   const send = () => { if (!empty) sendGoal(value) }
   return <div className="goal">
     <h3 className="goal-head">Name the agent and let the <img src={bull} alt="BuLLM" className="goal-bull" /> build it</h3>
     <p className="goal-lede">Type the goal. BuLL does the rest.</p>
     <div className="goal-box">
-      {!value && <div className="goal-ghost" aria-hidden><span>{GOAL_PREFIX}</span><span className="goal-ghost-tail">{example}</span></div>}
-      <textarea ref={ta} className="goal-input" rows={1} value={value} aria-label="Agent goal" onChange={e => setValue(e.target.value)}
+      {value === GOAL_PREFIX && <div className="goal-ghost" aria-hidden><span className="goal-ghost-pre">{GOAL_PREFIX}</span><span className="goal-ghost-tail">{example}</span></div>}
+      <textarea ref={ta} className="goal-input" rows={1} value={value} aria-label="Agent goal"
+        onChange={e => {
+          if (e.target.value.startsWith(GOAL_PREFIX)) { setValue(e.target.value); return }
+          // An edit landed inside the fixed phrase (drop, spell-check, autofill): restore it and put the caret after it.
+          requestAnimationFrame(() => ta.current?.setSelectionRange(PLEN, PLEN))
+        }}
+        onSelect={e => { const t = e.currentTarget; if (t.selectionStart < PLEN || t.selectionEnd < PLEN) t.setSelectionRange(Math.max(t.selectionStart, PLEN), Math.max(t.selectionEnd, PLEN)) }}
         onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
-        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} />
+        onKeyDown={e => {
+          const t = e.currentTarget
+          if (e.key === 'Backspace' && t.selectionStart <= PLEN && t.selectionEnd <= PLEN) { e.preventDefault(); return }
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() }
+        }} />
       <button type="button" className="goal-send" aria-label="Send goal" aria-disabled={empty || undefined} disabled={empty} onClick={send}><Icon name="tb-arrow-right" size={18} /></button>
     </div>
     <p className="goal-hint">Example goals cycle here - start typing to replace them.</p>
