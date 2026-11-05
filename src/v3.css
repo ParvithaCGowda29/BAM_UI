@@ -294,6 +294,12 @@
 /* Hide assistant joins once all three panes are in (per user, 5 Nov 2026): not on the goal-only start page. */
 html[data-upload-stage="1"] .shell[data-screen="1.1"] .as-hide,
 html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-hide { display: none; }
+/* Header title removed per user (5 Nov 2026): where the Hide assistant control is hidden too, the header row
+   would be an empty bar, so the whole row goes; the thread/goal card starts at the pane top. */
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .assist > .shell-head,
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .assist > .shell-head { display: none; }
+/* With the title gone the Hide assistant control is the header's only child - keep it at the right edge. */
+.assist > .shell-head { justify-content: flex-end; }
 html[data-upload-stage="1"] .shell[data-screen="1.1"] .workspace,
 html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace {
   /* Collapsed, not display:none, so the review dialog (a top-layer <dialog> inside this pane) can still open from the files pane. */

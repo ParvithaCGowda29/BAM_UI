@@ -191,12 +191,10 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
   // Verify (5 Nov 2026): a finished run is not posted in chat - chat only answers questions a person asks.
   // The sample results, failed answers and the gate line stay in the Verify panes.
   const toggle = () => setUi(s => ({ shell: { ...s.shell, assistant: !s.shell.assistant } }))
-  // Upload: the goal's state beside the title, and chips generated from the draft while it is the output on screen.
+  // Upload: chips generated from the draft while it is the output on screen.
   const goal = useGoal(s => s)
   // Goal flow (29 Oct 2026): the chips wait until files are uploaded, then come from the goal's draft (ThreadBody).
   const chipDraft = screenId === '1.1' && counts.uploadedCount > 0 ? goal.draft : null
-  const goalState = screenId !== '1.1' ? null : goal.draft ? goal.draft.title
-    : 'Goal · Ready'
 
   // Hidden by the person only (Hide assistant); a stage change never hides it. The runtime provider stays mounted, so
   // the thread keeps its messages and background posts (the upload summary) still reach it while the pane is hidden.
@@ -212,9 +210,10 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
   return (
     <AssistantRuntimeProvider runtime={runtime}>
     <ConfirmCtx.Provider value={pending}>
-      <aside className="shell-pane assist" aria-labelledby="assist-title" data-screen={screenId}>
+      <aside className="shell-pane assist" aria-label="BuLLM Assistant" data-screen={screenId}>
+        {/* Header row removed per user (5 Nov 2026): no "BuLLM Assistant" title or agent name; the Hide assistant
+            control stays, right-aligned, and only where it already appeared (all three panes in). */}
         <header className="shell-head">
-          <h2 id="assist-title"><Icon name="sparkle" size={13} />BuLLM Assistant{goalState && <span className="as-state">{goalState}</span>}</h2>
           <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant"><Icon name="panel-left" size={14} />Hide assistant</button>
         </header>
         <ScreenCtx.Provider value={screenId}>
