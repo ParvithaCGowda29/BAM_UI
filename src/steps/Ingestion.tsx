@@ -217,7 +217,11 @@ export const handedOn = (snap: Snapshot) => snap.uploads.some(u => snap.ingestio
 export function IngestReviewFooter({ snap }: { snap: Snapshot }) {
   const rag = useRag(s => s)
   const parsed = !!snap.ingestion && rag.steps.find(x => x.key === 'extract')?.status === 'done'
+  const closed = !snap.steps[0].editable
   return <Foot title={parsed ? 'Accepted, parsed files only' : 'Waiting for parsed files'} line="Context receives the accepted, parsed files">
+    {/* Missed a file while reviewing? (5 Nov 2026) Upload opens its picker; current files and review results are kept. */}
+    <button className="btn btn-secondary" disabled={closed} title={closed ? 'Uploads are closed.' : 'Add files you missed - current files and review results stay'}
+      onClick={() => { setUi({ armPicker: 'files' }); goScreen('1.1') }}><Icon name="tb-plus" />Add files</button>
     <GateButton icon="tb-clipboard-check" {...tips('1.4', 'Approve')} reason={parsed ? undefined : 'Parsing must finish first'} onClick={() => goScreen('2.5')}>Approve</GateButton></Foot>
 }
 

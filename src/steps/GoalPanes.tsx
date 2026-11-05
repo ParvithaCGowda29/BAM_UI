@@ -89,8 +89,6 @@ export function GoalCapture() {
         }} />
       <button type="button" className="goal-send" aria-label="Send goal" aria-disabled={empty || undefined} disabled={empty} onClick={send}><Icon name="tb-arrow-right" size={18} /></button>
     </div>
-    <p className="goal-hint">Example goals cycle here - start typing to replace them.</p>
-    <p className="goal-flow">Quote Automation: enquiry → cost estimate → quote → approval → delivery</p>
   </div>
 }
 

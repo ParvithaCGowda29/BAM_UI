@@ -20,6 +20,8 @@ export interface Ui {
   rejected: { name: string; reason: string; at: string }[]
   /** Files discarded from Upload in this session (Discard / Delete file / Replace), with the reason. Shown collapsed as Archive in 1.1. Discarding never deletes file data. */
   archived: { name: string; reason: string; at: string }[]
+  /** Set by Review's Add files (5 Nov 2026): Upload opens this picker as soon as its intake handler is registered. */
+  armPicker?: 'files' | 'folder' | 'zip'
   /** Upload record selected in 1.3 File detail. */
   fileDetail?: string
   /** Skill selected in 3.3 Skills/code review. */

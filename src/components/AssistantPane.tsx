@@ -241,12 +241,14 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
   else if (baseline.current === null) baseline.current = sentAll.length
   const since = baseline.current === null ? 0 : sentAll.length - baseline.current
   const names = snap.uploads.map(u => u.name).join('\u0000')
-  const chips = useMemo(() => !chipDraft || running ? [] : conversationChips(chipDraft, names ? names.split('\u0000') : [], since > 0 ? sentAll[sentAll.length - 1] : null),
-    [chipDraft, running, names, since, userTexts])
   const hasDraft = useGoal(s => !!s.draft)
   // Fresh entry (5 Nov 2026): a revived saved goal shows the goal capture first, not the expanded draft, whatever
   // the project's progress; Enter (or the first question asked) continues the saved project as stored.
   const atEntry = useGoal(() => atGoalEntry())
+  // Suggestions come only after an output exists - the expanded goal or an assistant reply - never before one (5 Nov 2026).
+  const hasOutput = useAuiState(s => s.thread.messages.some(m => m.role === 'assistant')) || (hasDraft && !atEntry)
+  const chips = useMemo(() => !chipDraft || running || !hasOutput ? [] : conversationChips(chipDraft, names ? names.split('\u0000') : [], since > 0 ? sentAll[sentAll.length - 1] : null),
+    [chipDraft, running, hasOutput, names, since, userTexts])
   useEffect(() => { if (!empty) continueGoal() }, [empty]) // asking something from the fresh entry also continues the project
   const composer = <Composer capture={capture} chips={chips} />
   // The first message: the idle Orb and greeting fade out over the conversation as it fades in (~300ms, no snap).
@@ -260,8 +262,9 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
       <ComposerPrimitive.AttachmentDropzone className="as-dropzone">
         {/* Upload, nothing said yet: the goal capture (29 Oct 2026) in place of the greeting. */}
         {empty && screenId === '1.1' ? <>
+          {/* The goal box is this screen's chat (5 Nov 2026): no second composer or suggestions under the capture. */}
           <div className="as-viewport">{hasDraft && !atEntry ? <GoalExpansion /> : <GoalCapture />}</div>
-          {composer}
+          {hasDraft && !atEntry && composer}
         </> : empty && hasDraft && !atEntry ? <>
           {/* Continuity (5 Nov 2026): the expanded goal stays at the top of the chat on every screen. */}
           <div className="as-viewport"><GoalExpansion /></div>

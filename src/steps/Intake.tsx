@@ -22,7 +22,7 @@ import { PipelineCard } from '../rag/RagScreens'
 import { Dialog, Icon, Time, fmtBytes } from '../components/ui'
 import { plural } from '../lib/bamUi.ts'
 import { ScanTable, ScreenTitle, SecurityDetails } from './IngestionFlow'
-import { UploadResults, setPickHandler } from './UploadPanes'
+import { UploadResults, openPicker, setPickHandler } from './UploadPanes'
 import { addFilesLocked } from '../lib/goal.ts'
 
 const TYPES_LABEL = ACCEPTED_TYPES.map(t => t.slice(1).toUpperCase()).join(', ')
@@ -507,6 +507,9 @@ export function Intake({ snap, info, view }: StepProps & { view: 'upload' | 'sca
   const takeRef = useRef(take)
   takeRef.current = take
   useEffect(() => { if (view !== 'upload' || closed) return; setPickHandler((l, src) => takeRef.current(l, src)); return () => setPickHandler(null) }, [view, closed])
+  // "Add files" from Review (1.4) lands here: Upload is open and the handler above is registered, so the picker opens at once.
+  const armPicker = useUi(s => s.armPicker)
+  useEffect(() => { if (view === 'upload' && !closed && armPicker) { setUi({ armPicker: undefined }); openPicker(armPicker) } }, [view, closed, armPicker])
   const docs = snap.uploads.length
   const failedUploads = Object.values(uppyFiles).filter(f => f.error)
   const dialogs = <>
