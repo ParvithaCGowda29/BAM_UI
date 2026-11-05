@@ -200,27 +200,38 @@ html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-send { width: 40px; 
 }
 
 /* ---- Transition: Fade & Settle (5 Nov 2026, option A chosen by the user) -------------------------------------------
-   Start screen to workspace, ~1.3s in all. The hero and goal card ease out first (.goal-exit, GoalCapture waits 350ms);
-   then the chrome fades in staggered, the pane background fades, and the chat content rises in. CSS only, so state and
-   behaviour are untouched; animations start when the stage-2 rules begin to match. Both themes share the motion. */
+   Start screen to workspace, ~1.3s in all. The hero fades out while a copy of the goal card flies to the chat composer
+   slot (flyCard in GoalPanes.tsx); 100ms in, the workspace fades in around it, the start gradient fades out behind it
+   (so no blank frame), and the chat content rises in staggered. The top bar never animates. State and behaviour are
+   untouched. Both themes share the motion. */
 @keyframes fs-hero-out { to { opacity: 0; transform: translateY(-16px); } }
-@keyframes fs-card-out { to { opacity: 0; transform: translateY(28px) scale(.985); } }
-@keyframes fs-from-top { from { opacity: 0; transform: translateY(-8px); } }
 @keyframes fs-from-left { from { opacity: 0; transform: translateX(-12px); } }
 @keyframes fs-fade { from { opacity: 0; } }
 @keyframes fs-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fs-bg-out { to { opacity: 0; } }
 .goal-exit .goal-head, .goal-exit .goal-lede { animation: fs-hero-out 350ms cubic-bezier(.65,0,.35,1) forwards; }
-.goal-exit .goal-box { animation: fs-card-out 450ms cubic-bezier(.65,0,.35,1) 100ms forwards; pointer-events: none; }
+.fs-fly { position: fixed; z-index: 90; box-sizing: border-box; overflow: hidden; pointer-events: none; }
+.fs-fly-text, .fs-fly-ph { position: absolute; left: 22px; right: 70px; top: 50%; transform: translateY(-50%); font: 400 15px/1.4 inherit; font-family: inherit;
+  color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fs-fly-ph { left: 56px; color: var(--text-3, #7B8794); opacity: 0; }
+/* The start gradient fades out behind the arriving panes instead of switching off. */
+html[data-upload-stage="2"] .shell[data-screen="1.1"] { position: relative; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"]::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; animation: fs-bg-out 700ms cubic-bezier(.33,1,.68,1) 100ms forwards;
+  background: radial-gradient(130% 95% at 50% 118%, rgba(228, 193, 128, .95), rgba(228, 193, 128, 0) 68%), linear-gradient(180deg, #FBFDFE 0%, #E9F4FB 30%, #CDE6F4 62%, #C7DFEA 100%); }
+:root[data-theme="dark"][data-upload-stage="2"] .shell[data-screen="1.1"]::before {
+  background: radial-gradient(120% 85% at 50% 118%, rgba(80, 76, 44, .8), rgba(80, 76, 44, 0) 62%), linear-gradient(180deg, #070E1C 0%, #081C30 30%, #0B2942 62%, #0E2E47 100%); }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] > .shell-slot { position: relative; z-index: 1; }
 html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-nav { animation: fs-from-left 500ms cubic-bezier(.33,1,.68,1) 100ms both; }
-html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist .assist { animation: fs-fade 500ms cubic-bezier(.33,1,.68,1) both; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist .assist { animation: fs-fade 500ms cubic-bezier(.33,1,.68,1) 100ms both; }
 html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > * { animation: fs-rise 420ms cubic-bezier(.33,1,.68,1) both; }
-html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(1) { animation-delay: 450ms; }
-html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(2) { animation-delay: 570ms; }
-html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(n+3) { animation-delay: 690ms; }
-html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-compose { animation: fs-rise 420ms cubic-bezier(.33,1,.68,1) 700ms both; }
-html[data-upload-stage="2"] .app > header:first-of-type, html[data-upload-stage="2"] .topbar { animation: fs-from-top 400ms cubic-bezier(.33,1,.68,1) 50ms both; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(1) { animation-delay: 550ms; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(2) { animation-delay: 670ms; }
+html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(n+3) { animation-delay: 790ms; }
+/* The live composer is in its slot from the start (so the card can measure it) but only shows once the card lands. */
+html[data-fs-landing] .assist .as-compose { animation: fs-fade 140ms linear 700ms both; }
 @media (prefers-reduced-motion: reduce) {
-  .goal-exit .goal-head, .goal-exit .goal-lede, .goal-exit .goal-box,
+  .goal-exit .goal-head, .goal-exit .goal-lede, .fs-fly,
   html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-nav, html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist .assist,
-  html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > *, html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-compose { animation: none; }
+  html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > * { animation: none; }
+  html[data-upload-stage="2"] .shell[data-screen="1.1"]::before { display: none; }
 }

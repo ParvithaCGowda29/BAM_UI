@@ -48,6 +48,45 @@ export function sendGoal(raw: string) {
 /** The saved goal normalized for the entry box, prefixed the way sendGoal's fdeGoals line does it. */
 const entryText = () => { const t = getGoal().text ?? ''; return !t || t.startsWith(GOAL_PREFIX) ? t || GOAL_PREFIX : GOAL_PREFIX + (/^[A-Z][a-z]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t) }
 
+/** Option A motion: a copy of the goal card flies from the start screen to the chat composer slot (700ms, ease-in-out),
+ *  its text crossfading to the composer placeholder; the real composer owns the slot at the end. The workspace starts
+ *  fading in 100ms after the hero, so there is never a blank frame. */
+function flyCard(box: HTMLElement, text: string, go: () => void) {
+  const r = box.getBoundingClientRect(), cs = getComputedStyle(box)
+  const fly = document.createElement('div')
+  fly.className = 'fs-fly'
+  Object.assign(fly.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, background: cs.backgroundColor,
+    border: cs.border, boxShadow: cs.boxShadow, borderRadius: cs.borderRadius })
+  const t = document.createElement('div'), ph = document.createElement('div')
+  t.className = 'fs-fly-text'; t.textContent = text
+  ph.className = 'fs-fly-ph'; ph.textContent = 'Ask about this output...'
+  fly.append(t, ph)
+  document.body.append(fly)
+  box.style.visibility = 'hidden'
+  const ease = 'cubic-bezier(.65,0,.35,1)'
+  setTimeout(() => {
+    document.documentElement.dataset.fsLanding = '1' // hides the live composer until the card lands
+    go() // the workspace takes over underneath (it fades in; the gradient fades out)
+    let tries = 0
+    const land = () => {
+      const c = document.querySelector('.assist .as-composer') as HTMLElement | null
+      const tr = c?.getBoundingClientRect()
+      if (!tr || !tr.width) { if (++tries < 40) { requestAnimationFrame(land); return } fly.remove(); delete document.documentElement.dataset.fsLanding; return }
+      const kf = { left: `${tr.left}px`, top: `${tr.top}px`, width: `${tr.width}px`, height: `${tr.height}px`, borderRadius: '18px' }
+      const move = fly.animate([{ left: fly.style.left, top: fly.style.top, width: fly.style.width, height: fly.style.height, borderRadius: cs.borderRadius }, kf],
+        { duration: 700, easing: ease, fill: 'forwards' })
+      t.animate([{ opacity: 1 }, { opacity: 1, offset: .6 }, { opacity: 0 }], { duration: 700, fill: 'forwards' })
+      ph.animate([{ opacity: 0 }, { opacity: 0, offset: .6 }, { opacity: 1 }], { duration: 700, fill: 'forwards' })
+      move.onfinish = () => {
+        // Hand off to the live composer over 140ms.
+        const out = fly.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' })
+        out.onfinish = () => { fly.remove(); delete document.documentElement.dataset.fsLanding }
+      }
+    }
+    requestAnimationFrame(() => requestAnimationFrame(land))
+  }, 100)
+}
+
 /** Middle pane on Upload while the thread is empty and no goal is expanded yet. */
 export function GoalCapture() {
   const PLEN = GOAL_PREFIX.length
@@ -64,23 +103,23 @@ export function GoalCapture() {
   useEffect(() => { const e = ta.current; if (e) { e.style.height = 'auto'; e.style.height = `${Math.min(e.scrollHeight, 160)}px` } }, [value])
   const typed = value.slice(PLEN)
   const empty = !typed.trim()
+  const boxRef = useRef<HTMLDivElement>(null)
   const send = () => {
-    if (empty) return
+    if (empty || leaving.current) return
     // Fresh entry, saved goal sent unchanged: continue the saved draft as is - never re-expand it (in-place edits survive).
-    if (atGoalEntry() && getGoal().draft && value.trim() === entryText()) { continueGoal(); return }
-    // Fade & Settle (5 Nov 2026, option A): the hero and card ease out for 350ms before the workspace takes over,
-    // so nothing vanishes in a hard cut. Reduced motion skips the wait.
-    if (leaving.current) return
+    const resume = atGoalEntry() && !!getGoal().draft && value.trim() === entryText()
+    const go = () => { if (!resume) sendGoal(value); continueGoal() }
+    // Fade & Settle (5 Nov 2026, option A): the hero fades out while the goal card flies to the chat composer slot and
+    // docks there as the workspace fades in around it - nothing vanishes in a hard cut. Reduced motion skips it.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !boxRef.current) { go(); return }
     leaving.current = true
-    const go = () => { sendGoal(value); continueGoal(); setExit(false); leaving.current = false }
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { go(); return }
     setExit(true)
-    setTimeout(go, 350)
+    flyCard(boxRef.current, value, go)
   }
   return <div className={`goal${exit ? ' goal-exit' : ''}`}>
     <h3 className="goal-head">Name the agent and let the <img src={bull} alt="BuLLM" className="goal-bull" /> build it</h3>
     <p className="goal-lede">Type the goal. BuLL does the rest.</p>
-    <div className="goal-box">
+    <div className="goal-box" ref={boxRef}>
       {value === GOAL_PREFIX && <div className="goal-ghost" aria-hidden><span className="goal-ghost-pre">{GOAL_PREFIX}</span><span className="goal-ghost-tail">{example}</span></div>}
       <textarea ref={ta} className="goal-input" rows={1} value={value} aria-label="Agent goal"
         onChange={e => {
