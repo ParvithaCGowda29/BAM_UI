@@ -304,7 +304,7 @@ html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace dialog { visibi
 @media (min-width: 861px) {
   html[data-upload-stage="1"] .shell[data-screen="1.1"] { grid-template-columns: minmax(0, 1fr); }
   html[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-nav { display: none; }
-  html[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-assist { width: min(760px, 100%); margin-inline: auto; }
+  html[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-assist { width: min(1060px, calc(100% - 32px)); margin-inline: auto; }
   html[data-upload-stage="2"] .shell[data-screen="1.1"] { grid-template-columns: var(--nav) var(--assist); }
 }
 @media (max-width: 860px) {

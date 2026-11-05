@@ -308,6 +308,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 600; font-size: 14px; cursor: pointer; border: 1px solid transparent; white-space: nowrap;
 }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+/* Action-button family (5 Nov 2026, approved): the footer actions share the bam-btn pill shape - colours,
+   labels, icons, states and behaviour unchanged. */
+.pane-foot .btn, .ws-foot .btn { height: 40px; padding: 0 18px; border-radius: 999px; }
+.pane-foot .bam-btn, .ws-foot .bam-btn { min-height: 40px; }
 .btn-primary { background: var(--accent); color: var(--accent-ink); }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-secondary { background: var(--surface-3); border-color: var(--border-strong); }

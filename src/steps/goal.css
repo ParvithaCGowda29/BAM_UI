@@ -163,3 +163,38 @@
 .goal-row dd { margin: 2px 0 0 28px; padding: 2px 4px; border-radius: 6px; font-size: 14px; line-height: 1.5; outline: none; }
 .goal-row dd:hover { background: var(--surface-2); }
 .goal-row dd:focus-visible { box-shadow: var(--focus); }
+
+/* ---- start screen (approved wireframe B, 5 Nov 2026): full-bleed brand gradient, centred hero, floating card.
+   Stage 1 (fresh goal entry) only; every other upload stage and screen keeps the pane chrome. Colours sampled
+   from the approved light/dark wireframes. Send stays brand blue (her pick over the wireframe's orange). ---- */
+html[data-upload-stage="1"] .shell[data-screen="1.1"] {
+  background:
+    radial-gradient(130% 95% at 50% 118%, rgba(228, 193, 128, .95), rgba(228, 193, 128, 0) 68%),
+    linear-gradient(180deg, #FBFDFE 0%, #E9F4FB 30%, #CDE6F4 62%, #C7DFEA 100%);
+}
+:root[data-theme="dark"][data-upload-stage="1"] .shell[data-screen="1.1"] {
+  background:
+    radial-gradient(120% 85% at 50% 118%, rgba(80, 76, 44, .8), rgba(80, 76, 44, 0) 62%),
+    linear-gradient(180deg, #070E1C 0%, #081C30 30%, #0B2942 62%, #0E2E47 100%);
+}
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-assist .assist { background: transparent; border-color: transparent; box-shadow: none; }
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-assist .assist .shell-head { border-bottom-color: transparent; }
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .as-viewport { justify-content: center; padding-bottom: 11vh; }
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal { width: 100%; gap: 18px; }
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-head { font-size: 40px; letter-spacing: -.02em; }
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-lede { font-size: 15px; }
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-box {
+  max-width: 660px; width: 100%; margin-inline: auto; padding: 20px 20px 16px 22px; border-radius: 24px;
+  border: 1px solid rgb(15 23 42 / .07); background: #FFFFFF;
+  box-shadow: 0 24px 60px -18px rgb(13 58 92 / .35), 0 2px 8px rgb(13 58 92 / .08);
+}
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-box:focus-within { border-color: var(--bl-blue); }
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-ghost { left: 22px; top: 20px; }
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-send { width: 40px; height: 40px; border-radius: 12px; }
+:root[data-theme="dark"][data-upload-stage="1"] .shell[data-screen="1.1"] .goal-box {
+  border-color: rgb(255 255 255 / .09); background: #101D2F;
+  box-shadow: 0 24px 60px -18px rgb(0 0 0 / .6), 0 2px 8px rgb(0 0 0 / .35);
+}
+@media (max-width: 900px) {
+  html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-head { font-size: 30px; white-space: normal; }
+}
