@@ -1,91 +1,9 @@
-// Global destinations outside the four workflow stages (BAM v3): Usage & improvement (top-bar gauge) and
-// Admin > Masters (profile menu). Both are read-only with respect to the workflow: nothing here approves,
-// regenerates, publishes or deploys.
+// Global destination outside the four workflow stages (BAM v3): Admin > Masters (profile menu). Read-only with
+// respect to the workflow: nothing here approves, regenerates, publishes or deploys.
 import { useEffect, useState } from 'react'
-import type { Snapshot } from '../api/types'
-import { setUi, useUi } from '../lib/store'
-import { GLOBAL_ROUTES, STATUS_LABEL, TASKS, countedOf, doneCount, taskStatus } from '../tracker/trackerConfig.ts'
-import { useStatuses } from '../tracker/useTrackerStore'
+import { GLOBAL_ROUTES } from '../tracker/trackerConfig.ts'
 import { MASTER_SUMMARIES } from '../rag/CogneePreflightCockpit'
-import { Empty, Icon, Kpis, StatusPill, Time } from '../components/ui'
-
-// ---- Usage & improvement ----------------------------------------------------------------------------------
-export function UsagePage({ snap }: { snap: Snapshot }) {
-  const statuses = useStatuses()
-  const usage = useUi(s => s.usage)
-  const notes = useUi(s => s.notes)
-  const [draft, setDraft] = useState('')
-  const client = snap.sow?.meta.client
-  const set = (patch: Partial<typeof usage>) => setUi(s => ({ usage: { ...s.usage, ...patch } }))
-  const stages = TASKS.map(t => ({ t, done: doneCount(countedOf(t.id), statuses), total: countedOf(t.id).length, st: taskStatus(t.id, statuses) }))
-  const screensDone = stages.reduce((n, s) => n + s.done, 0), screens = stages.reduce((n, s) => n + s.total, 0)
-  const runs = snap.testHistory.length + (snap.tests ? 1 : 0)
-  const blocked = Object.values(statuses).filter(s => s === 'blocked').length
-  const add = () => {
-    const text = draft.trim()
-    if (!text) return
-    setUi(s => ({ notes: [{ id: crypto.randomUUID(), text, at: new Date().toISOString() }, ...s.notes] }))
-    setDraft('')
-  }
-  return (
-    <div className="rag">
-      <div className="rag-col">
-        <header className="v3-head">
-          <h2 id="center-title" tabIndex={-1}>Usage &amp; improvement</h2>
-          <p className="muted sm">How this workflow is progressing, and proposals to improve it. Read-only: nothing here changes a workflow.</p>
-        </header>
-        <div className="filter-chips" role="group" aria-label="Filters">
-          <label className="v3-filter">Client
-            <select className="select" value={usage.client} onChange={e => set({ client: e.target.value })}>
-              <option value="all">All clients</option>{client && <option value={client}>{client}</option>}
-            </select>
-          </label>
-          <label className="v3-filter">Workflow
-            <select className="select" value={usage.workflow} onChange={e => set({ workflow: e.target.value })}>
-              <option value="all">All workflows</option><option value={snap.workflowName}>{snap.workflowName}</option>
-            </select>
-          </label>
-          <label className="v3-filter">Date range
-            <select className="select" value={usage.range} onChange={e => set({ range: e.target.value as typeof usage.range })}>
-              <option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option>
-            </select>
-          </label>
-        </div>
-        <Kpis label="This workflow" items={[
-          { value: `${stages.filter(s => s.st === 'done').length} of ${stages.length}`, label: 'Stages done' },
-          { value: `${screensDone} of ${screens}`, label: 'Screens done' },
-          { value: runs, label: 'Test runs' },
-          { value: blocked, label: 'Blocked screens', tone: blocked ? 'err' : undefined },
-        ]} />
-        <section className="v3-card" aria-labelledby="us-stage">
-          <h3 id="us-stage" className="v3-card-title"><Icon name="checklist" size={14} />Stage completion (this workflow)</h3>
-          <ul className="bars">{stages.map(s => (
-            <li key={s.t.id}>
-              <span className="bar-label">{s.t.label}</span>
-              <span className="v3-meter" role="meter" aria-valuemin={0} aria-valuemax={s.total} aria-valuenow={s.done} aria-label={`${s.t.label}: ${s.done} of ${s.total} screens done`}><span style={{ width: `${s.total ? s.done / s.total * 100 : 0}%` }} /></span>
-              <span className="muted xs bar-value">{s.done}/{s.total} · {STATUS_LABEL[s.st]}</span>
-            </li>
-          ))}</ul>
-        </section>
-        <section className="v3-card" aria-labelledby="us-week">
-          <h3 id="us-week" className="v3-card-title"><Icon name="gauge" size={14} />Accepted outcomes per week</h3>
-          <Empty icon="gauge" title="No usage analytics yet">Cross-workflow trends are not available yet. No usage events are captured; prompts, document names and credentials never would be.</Empty>
-        </section>
-        <section className="v3-card" aria-labelledby="us-notes">
-          <h3 id="us-notes" className="v3-card-title"><Icon name="note" size={14} />Improvement notes</h3>
-          <p className="muted xs">A note is a proposal for the team. It never approves, regenerates, publishes or deploys anything. Saved on this device.</p>
-          <label className="sr-only" htmlFor="us-note">Improvement note</label>
-          <textarea id="us-note" className="textarea" rows={3} value={draft} onChange={e => setDraft(e.target.value)} placeholder="What would make this workflow better?" />
-          <div className="row"><button className="btn btn-primary" disabled={!draft.trim()} onClick={add}><Icon name="note" />Create improvement note</button></div>
-          {notes.length > 0 && <ul className="note-list">{notes.map(n => (
-            <li key={n.id}><span className="note-text">{n.text}</span><Time iso={n.at} />
-              <button className="icon-btn sm" aria-label="Delete note" title="Delete note" onClick={() => setUi(s => ({ notes: s.notes.filter(x => x.id !== n.id) }))}><Icon name="x" size={12} /></button></li>
-          ))}</ul>}
-        </section>
-      </div>
-    </div>
-  )
-}
+import { Icon, Kpis, StatusPill } from '../components/ui'
 
 // ---- Admin > Masters --------------------------------------------------------------------------------------
 const MASTERS = [

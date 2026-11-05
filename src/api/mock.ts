@@ -522,6 +522,8 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
   // ---- 1.1 virus scan (mock: no antivirus runs; outcomes come from the demo control) ----
   let scanOutcome: ScanOutcome = 'clean'
   const outcomes = new Map<string, ScanOutcome>()
+  // Discarded upload records (5 Nov 2026): Discard / Delete moves a record here, never deletes its data (Archive in 1.1).
+  const removedUploads: UploadRecord[] = []
   const logScan = (u: UploadRecord, kind: ScanEvent['kind']) => s.scanEvents.push({ id: rid('ev'), fileId: u.id, name: u.name, kind, at: now() })
   // clamd scans a few files at a time; the rest wait in quarantine (scan 'scanning', no scanStartedAt yet).
   let active = 0
@@ -609,6 +611,7 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
       await latency()
       if (u.scan === 'blocked') s.quarantine.push(structuredClone(u))
       s.uploads = s.uploads.filter(x => x.id !== id)
+      removedUploads.push(structuredClone(u))
       logScan(u, 'removed')
     },
     async retryScan(id) {

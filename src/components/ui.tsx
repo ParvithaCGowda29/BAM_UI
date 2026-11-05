@@ -368,6 +368,15 @@ export function AutoChip({ className = '' }: { className?: string }) {
   return <Tip text="Automated"><span className={`auto-chip ${className}`} tabIndex={0} aria-label="Automated"><AutomatedIcon /></span></Tip>
 }
 
+/** A step gated on a person (`mode: 'hitl'` in trackerConfig): Lucide person-outline chip, "Human gate" on hover/focus. */
+export function HumanIcon() {
+  return <svg className="auto-icon hitl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+}
+
+export function HitlChip({ className = '' }: { className?: string }) {
+  return <Tip text="Human gate"><span className={`auto-chip hitl-chip ${className}`} tabIndex={0} aria-label="Human gate"><HumanIcon /></span></Tip>
+}
+
 // A gate button: when disabled it says why, right next to it. With `tip`, it also explains itself on hover/focus.
 export function GateButton({ children, reason, onClick, variant = 'primary', busy, icon, action, successKey, tip, tipReason, tipBusy }: {
   children: ReactNode; reason?: string; onClick: () => unknown; variant?: 'primary' | 'secondary' | 'danger'; busy?: boolean; icon?: string

@@ -7,7 +7,7 @@ import { getUi, setUi, useUi } from './lib/store'
 import { activeScreen, aliasOf, goScreen, navigate, usePath } from './lib/route'
 import { NavRail, TopBar } from './components/shell'
 import { AssistantPane } from './components/AssistantPane'
-import { AutoChip, Banner, Confirm, Empty, ErrorState, Icon, PanesContext, Skeleton } from './components/ui'
+import { AutoChip, Banner, Confirm, Empty, ErrorState, HitlChip, Icon, PanesContext, Skeleton } from './components/ui'
 import * as Step1 from './steps/Step1'
 import * as Step2 from './steps/Step2'
 import * as Step3 from './steps/Step3'
@@ -16,7 +16,7 @@ import { Connectors, FileDetail, IngestReviewFooter, handedOn, IngestionReview, 
 import { StandardizeFooter, StandardizeView } from './steps/Standardize'
 import { UploadCount, UploadMenu, useUploadRows } from './steps/UploadPanes'
 import { goalStage, useGoal } from './lib/goal.ts'
-import { MastersPage, UsagePage } from './steps/Global'
+import { MastersPage } from './steps/Global'
 import { ReleasePrep, SkillReview } from './steps/Review'
 import { SCREEN_ROUTES, STEP_SCREEN, globalByPath, screenByPath, screenLabel, stageOf } from './tracker/trackerConfig.ts'
 import { AutoContextFooter, QualityFooter, ReviewFooter, SyncFooter, SyncView, useContextAutomation } from './rag/RagSeamless'
@@ -168,7 +168,7 @@ function Workbench() {
   const templateReady = screen?.id === '4.2' && info?.state === 'locked' && !snap.workflow && snap.sow?.status === 'approved'
   const locked = info?.state === 'locked' && !templateReady ? (prerequisite(snap, rag, info.id)?.reason ?? `${info.reason}.`) : undefined
   let body
-  if (global) body = global === 'usage' ? <UsagePage snap={snap} /> : <MastersPage />
+  if (global) body = <MastersPage />
   else if (!info) {
     const View = VIEWS[screen!.id]
     body = <><ContextBar snap={snap} screenId={screen!.id} /><PanesContext.Provider value><View snap={snap} path={path} /></PanesContext.Provider></>
@@ -190,8 +190,8 @@ function Workbench() {
       </PanesContext.Provider>
     </>
   }
-  const title = global ? (global === 'usage' ? 'Usage & improvement' : 'Masters') : screenLabel(screen!.id)
-  const hint = global === 'usage' ? 'Read-only. Notes are proposals and never change a workflow.' : global === 'admin' ? 'Admin' : screen!.item.description
+  const title = global ? 'Masters' : screenLabel(screen!.id)
+  const hint = global ? 'Admin' : screen!.item.description
   // One primary action, pinned below the body; a footer that renders nothing (Review while waiting) draws no bar.
   const foot = screen && FOOT[screen.id] && (info?.state !== 'locked' || templateReady) ? FOOT[screen.id]({ snap, info }) : null
   return (
@@ -208,7 +208,7 @@ function Workbench() {
           <header className="shell-head ws-head">
             {screen?.id === '1.1'
               ? <UploadHead snap={snap} />
-              : <><h2 id="ws-title" tabIndex={-1}><Icon name="table" size={13} /><span className="ws-kicker">Results &amp; edits</span><span className="ws-title">{title}</span></h2>{screen?.item.mode === 'automated' && <AutoChip className="ws-auto" />}
+              : <><h2 id="ws-title" tabIndex={-1}><Icon name="table" size={13} /><span className="ws-kicker">Results &amp; edits</span><span className="ws-title">{title}</span></h2>{screen?.item.mode === 'automated' && <AutoChip className="ws-auto" />}{screen?.item.mode === 'hitl' && <HitlChip className="ws-auto" />}
                 <span className="ws-hint" title={hint}>{hint}</span></>}
           </header>
           <div className="ws-body">{body}</div>

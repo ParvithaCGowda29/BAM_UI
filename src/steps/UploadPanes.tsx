@@ -9,7 +9,7 @@ import { api } from '../api/adapter'
 import { ACCEPTED_TYPES, MAX_BATCH_BYTES, type Snapshot } from '../api/types'
 import { SYSTEM_FILE_LABEL, isReleased } from '../api/scanGate.ts'
 import { LANES, detectKind, type Kind } from '../api/fileKind.ts'
-import { setUi, uppy, useUi } from '../lib/store'
+import { archive, setUi, uppy, useUi } from '../lib/store'
 import { plural } from '../lib/bamUi.ts'
 import { useAction } from '../lib/data'
 import { Confirm, Icon, Tip } from '../components/ui'
@@ -226,6 +226,7 @@ function fixOf(r: UpRow): { title: string; line: string; retry: boolean } {
 }
 /** Removes a row: stored files through the backend (same gate as Reset), in-flight ones from the uploader, refused ones from the list. */
 async function discard(snap: Snapshot, row: UpRow) {
+  archive(row.name, row.reason || 'Removed from the upload list')
   if (snap.uploads.some(u => u.id === row.id)) await api.removeUpload(row.id)
   else if (uppy.getFile(row.id)) uppy.removeFile(row.id)
   else if (row.id.startsWith('refused-')) { const i = Number(row.id.slice(8)); setUi(s => ({ rejected: s.rejected.filter((_, j) => j !== i) })) }
@@ -244,6 +245,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
   const rows = all.filter(isAdded), failed = all.filter(r => r.state === 'failed')
   const review = useReviewFiles(snap).ids
   const objective = useUi(s => (s.fdeGoals ?? '').trim())
+  const archived = useUi(s => s.archived)
   const flow = useGoal(s => (s.draft ? flowLine(s.draft.goal) : ''))
   const { busy: acting, run } = useAction()
   const closed = !snap.steps[0].editable
@@ -317,6 +319,11 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
         <ul className="up-lanes">{LANES.map(l => <li key={l}><strong>{rows.filter(r => r.kind.lane === l).length}</strong><span>{l}</span></li>)}</ul></section>
       <section className="up-quota"><span>Space used <strong>{pctText}</strong> of engagement quota</span>
         <span className="up-bar" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Space used"><span style={{ width: `${pct}%` }} /></span></section>
+      {archived.length > 0 && <details className="up-archive">
+        <summary><strong>Archive</strong><span className="dc-count">{archived.length}</span><Icon name="down" size={13} /></summary>
+        <p className="muted xs">Discarded files stay listed here. Removing a file from the list never deletes its data.</p>
+        <ul className="dc-files">{archived.map((a, i) => <li key={i}><Icon name="tb-file" size={15} /><span className="dc-name">{a.name}</span><span className="muted xs">{a.reason}</span></li>)}</ul>
+      </details>}
       {menu && <RowMenu snap={snap} {...menu} onClose={() => setMenu(null)} />}
     </main>
   )

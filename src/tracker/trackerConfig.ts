@@ -35,7 +35,7 @@ export interface TrackerItem {
   optional?: boolean
   /** Internal diagnostics (scan, quarantine): hidden from the FDE everywhere; the route redirects to Upload. */
   internal?: boolean
-  /** Execution mode: a human checkpoint (HITL) or a step that runs on its own (Automated, tagged in the rail and header). */
+  /** Execution mode: a human checkpoint (HITL, person chip) or a step that runs on its own (Automated, bull chip); both tagged in the rail and header. */
   mode?: 'hitl' | 'automated'
 }
 
@@ -49,13 +49,13 @@ const screen = (id: string, parentId: string, label: string, icon: string, path:
 // Earlier screens keep their IDs and routes: they are renamed, moved, or kept as hidden details of a final step.
 // `internal` screens (virus scan, quarantine, file detail) are diagnostics with no FDE role: never listed, searched
 // or opened by the FDE (their old URLs redirect to Upload); the scan and quarantine still enforce every gate.
-// Admin and Usage & improvement are global destinations (GLOBAL_ROUTES), not workflow screens.
+// Admin is a global destination (GLOBAL_ROUTES), not a workflow screen.
 export const TRACKER_ITEMS: readonly TrackerItem[] = [
   stage('1', 'Ingestion', 'tb-inbox', 'Add the source documents, standardize and parse them, then confirm what goes to Context.'),
   screen('1.1', '1', 'Upload', 'tb-upload', '/ingestion/upload', 'Choose source files and track upload readiness.', { step: 1 }),
   screen('1.8', '1', 'Standardize', 'tb-transform', '/ingestion/standardize', 'Classify each file, keep the original, flag problems and decide: ready, local AI fix or manual review.', { mode: 'automated' }),
   screen('1.9', '1', 'Parse', 'tb-file-code', '/ingestion/parse', 'Extract text, tables and structure from the ready files.', { mode: 'automated' }),
-  screen('1.4', '1', 'Review', 'tb-clipboard-check', '/ingestion/review', 'Confirm the accepted, parsed files that go to Context. Not SOW approval.'),
+  screen('1.4', '1', 'Review', 'tb-clipboard-check', '/ingestion/review', 'Confirm the accepted, parsed files that go to Context. Not SOW approval.', { mode: 'hitl' }),
   screen('1.6', '1', 'Connectors', 'plug', '/ingestion/connectors', 'Optional. Pull documents from a connected source.', { hidden: true, navAs: '1.4', optional: true }),
   screen('1.5', '1', 'Scan', 'scan', '/ingestion/scan', 'Internal diagnostics: per-file virus scan.', { step: 1, hidden: true, internal: true, navAs: '1.1' }),
   screen('1.7', '1', 'Quarantine', 'shield', '/ingestion/quarantine', 'Internal diagnostics: files held by the scan.', { hidden: true, internal: true, navAs: '1.1' }),
@@ -69,25 +69,24 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   screen('2.4', '2', 'Context readiness', 'doccheck', '/rag/review', 'Graph, schema and retrieval readiness, the knowledge bundle and provenance.', { hidden: true, navAs: '2.3' }),
 
   stage('3', 'Workbench', 'tb-briefcase', 'Approve the scope, review the skills grid, then the manifest and the translated code.'),
-  screen('3.1', '3', 'Scope', 'tb-target', '/workbench/sow', 'SOW review and FDE approval.', { step: 1 }),
-  screen('3.2', '3', 'Grid', 'tb-table', '/workbench/skills', 'Agent > Skill review with all seven ISATVON fields.', { step: 2 }),
+  screen('3.1', '3', 'Scope', 'tb-target', '/workbench/sow', 'SOW review and FDE approval.', { step: 1, mode: 'hitl' }),
+  screen('3.2', '3', 'Grid', 'tb-table', '/workbench/skills', 'Agent > Skill review with all seven ISATVON fields.', { step: 2, mode: 'hitl' }),
   screen('4.2', '3', 'Template', 'tb-template', '/workbench/manifest', 'manifest.json, linked to the approved Scope and Grid.', { step: 3 }),
-  screen('4.3', '3', 'Translate', 'tb-code', '/workbench/code', 'Translation: the translated skill code and its translation check.', { step: 3 }),
+  screen('4.3', '3', 'Translate', 'tb-code', '/workbench/code', 'Translation: the translated skill code and its translation check.', { step: 3, mode: 'hitl' }),
   screen('3.3', '3', 'Skill review', 'eye', '/workbench/review', 'One skill at a time: its contract, generated code diff and review findings (read-only).', { hidden: true, navAs: '3.2' }),
   screen('3.4', '3', 'Release prep', 'checklist', '/workbench/release', 'Manifest version, release prerequisites and version history.', { hidden: true, navAs: '4.3' }),
 
   stage('4', 'Validation', 'tb-shield-check', 'Run the isolated sandbox, check the results, certify the checked artifact and commit it to BAM_db.'),
   screen('4.8', '4', 'Sandbox', 'tb-box', '/validation/sandbox', 'Create and run the isolated validation environment.', { step: 4 }),
   screen('4.4', '4', 'Check', 'tb-list-check', '/sandbox/results', 'Validation results and evidence for the current artifact.', { step: 4 }),
-  screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Record approval of the checked artifact. Commit comes next.', { step: 4 }),
+  screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Record approval of the checked artifact. Commit comes next.', { step: 4, mode: 'hitl' }),
   screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Save the certified artifact to BAM_db, then deploy it to Staging.', { step: 4 }),
   screen('4.1', '4', 'Validation activities', 'circle-check', '/workbench/validation', 'Check activities A–D with attempt history and findings.', { step: 3, hidden: true, navAs: '4.4' }),
   screen('4.7', '4', 'Staging complete', 'rocket', '/sandbox/staging', 'What is live on Staging. Staging complete never means production.', { step: 4, hidden: true, navAs: '4.6' }),
 ]
 
-/** Global destinations outside the four stages: Usage (top-bar gauge) and Admin (profile menu). */
+/** Global destinations outside the four stages: Admin (profile menu). */
 export const GLOBAL_ROUTES = {
-  usage: { path: '/usage', section: null, label: 'Usage & improvement' },
   admin: { path: '/admin/masters', section: 'Admin', label: 'Masters' },
 } as const
 export type GlobalRoute = keyof typeof GLOBAL_ROUTES

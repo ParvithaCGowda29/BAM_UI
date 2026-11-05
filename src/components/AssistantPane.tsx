@@ -262,10 +262,13 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
         {empty && screenId === '1.1' ? <>
           <div className="as-viewport">{hasDraft && !atEntry ? <GoalExpansion /> : <GoalCapture />}</div>
           {composer}
+        </> : empty && hasDraft && !atEntry ? <>
+          {/* Continuity (5 Nov 2026): the expanded goal stays at the top of the chat on every screen. */}
+          <div className="as-viewport"><GoalExpansion /></div>
+          {composer}
         </> : empty ? <div className="as-empty">
           <IdleOrb />
           <h3 className="as-hello">How can I help you today?</h3>
-          <p className="as-sub">Pack files added on the left go through the stages.<br />Attach a file here to ask questions about it.</p>
           <p className="as-sub" role="status">{note}</p>
           {composer}
         </div> : <>
@@ -273,7 +276,7 @@ function ThreadBody({ snap, screenId, note, capture, files, chipDraft }: { snap:
           {/* One persistent list: stage updates are messages in it (never a replaced note). Only live progress
               (a Verify run in flight, uploads in flight) sits after the messages until it finishes. */}
           <ThreadPrimitive.Viewport className={`as-viewport${leaving ? ' as-fade-in' : ''}`}>
-            {screenId === '1.1' && hasDraft && !atEntry && <GoalExpansion />}
+            {hasDraft && !atEntry && <GoalExpansion />}
             <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage, EditComposer }} />
             {screenId === '2.3' && <QualityProgress />}
             {/* Scrolled up to read history: a cue back to the newest message (assistant-ui disables it at the bottom). */}

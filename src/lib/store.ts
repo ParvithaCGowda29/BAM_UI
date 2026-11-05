@@ -18,6 +18,8 @@ export interface Ui {
   tracker: TrackerState
   /** Files refused at intake in this session (type/size limits, upload errors), with the reason. Shown in 1.2 and 1.4. */
   rejected: { name: string; reason: string; at: string }[]
+  /** Files discarded from Upload in this session (Discard / Delete file / Replace), with the reason. Shown collapsed as Archive in 1.1. Discarding never deletes file data. */
+  archived: { name: string; reason: string; at: string }[]
   /** Upload record selected in 1.3 File detail. */
   fileDetail?: string
   /** Skill selected in 3.3 Skills/code review. */
@@ -70,6 +72,7 @@ let state: Ui = {
   collapsed: { left: savedPanes ? savedPanes.left : true, right: savedPanes ? savedPanes.right : true },
   tracker: { statuses: initialStatuses(), basis: {}, evidence: initialStatuses(), previous: [], openTask: null, selected: null, loaded: false },
   rejected: [],
+  archived: [],
   fdeGoals: savedGoals,
   shell: { nav: savedShell?.nav === true, assistant: savedShell?.assistant === true },
   drawer: null,
@@ -154,6 +157,8 @@ export function uploadFiles(list: FileList | File[], batchId?: string) {
 }
 
 const reject = (name: string, reason: string) => setUi(s => ({ rejected: [...s.rejected, { name, reason, at: new Date().toISOString() }] }))
+/** Archive a discarded file (5 Nov 2026): the row leaves the list, its name and reason stay visible under Archive. File data is never deleted. */
+export const archive = (name: string, reason: string) => setUi(s => ({ archived: [...s.archived, { name, reason, at: new Date().toISOString() }] }))
 // Refused and failed files are listed in 1.1/1.2/1.4 (no notices, removed 9 Oct 2026).
 uppy.on('restriction-failed', (file, err) => reject(file?.name ?? 'File', err.message))
 uppy.on('upload-error', (file, err) => { if (file) reject(file.name ?? 'File', err?.message ?? 'Upload failed') })

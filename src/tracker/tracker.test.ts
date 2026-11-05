@@ -41,9 +41,9 @@ test('labels: no numeric prefixes, every screen has an icon', () => {
   }
 })
 
-test('global destinations: Usage & improvement and Admin are not workflow screens', () => {
-  assert.equal(GLOBAL_ROUTES.usage.label, 'Usage & improvement')
-  assert.equal(globalByPath('/usage'), 'usage')
+test('global destinations: Admin is not a workflow screen', () => {
+  assert.equal(GLOBAL_ROUTES.admin.label, 'Masters')
+  assert.equal(globalByPath('/usage'), undefined)
   assert.equal(globalByPath('/admin/masters'), 'admin')
   assert.ok(!SUBTASKS.some(s => /usage|workflows|agents|admin/i.test(s.label)), 'no left-rail Usage / Workflows / Agents entries')
 })

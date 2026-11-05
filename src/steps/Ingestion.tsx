@@ -169,7 +169,7 @@ export function IngestionReview({ snap }: { snap: Snapshot }) {
       <div className="dc-rows">
         {held.length > 0 && <details open>
           <summary><strong>Held for review</strong><span className="dc-count">{held.length}</span><Icon name="down" size={13} /></summary>
-          <ul className="dc-files">{held.map(f => <li key={f.u.id}><Icon name="alert" size={15} /><span className="dc-name">{f.u.name}</span><span className="muted xs">{STATE_TEXT[f.a.state]}{f.a.reason ? `: ${f.a.reason}` : ''} · not sent to Context</span></li>)}</ul>
+          <ul className="dc-files">{held.map(f => <li key={f.u.id}><Icon name="alert" size={15} /><span className="dc-name">{f.u.name}</span></li>)}</ul>
         </details>}
         {notHandedOn.length > 0 && <details open>
           <summary><strong>Not handed on</strong><span className="dc-count">{notHandedOn.length}</span><Icon name="down" size={13} /></summary>

@@ -6,7 +6,7 @@ import { goScreen, navigate, usePath } from '../lib/route'
 import { GLOBAL_ROUTES, STATUS_LABEL, SUBTASKS, TASKS, globalByPath, screenByPath, screenLabel, stageOf, subtasksOf, taskStatus, type TrackerStatus } from '../tracker/trackerConfig.ts'
 import { useStatuses } from '../tracker/useTrackerStore'
 import { signOut, switchToMasters, useSession } from '../features/login/session'
-import { AutoChip, Icon, Tip, fmtFull, fmtTime } from './ui'
+import { AutoChip, HitlChip, Icon, Tip, fmtFull, fmtTime } from './ui'
 import { AppSettingsModal } from './AppSettingsModal'
 import { BrandLockup } from './BrandLockup'
 import { UploadFilesBlock } from '../steps/UploadPanes'
@@ -23,7 +23,7 @@ export function TopBar({ syncedAt, offline }: { snap?: Snapshot; syncedAt: numbe
   const global = globalByPath(path)
   const theme = useUi(s => s.theme)
   const env = useUi(s => s.env)
-  // Breadcrumb: Stage › Step (Admin › Masters; Usage keeps the workspace name).
+  // Breadcrumb: Stage › Step (Admin › Masters keeps the workspace name).
   const first = global === 'admin' ? 'Admin' : id ? stageOf(id)?.label ?? '' : env === 'FDE' ? 'FDE workspace' : 'Staging'
   const current = global ? GLOBAL_ROUTES[global].label : id ? screenLabel(id) : ''
   return (
@@ -73,7 +73,7 @@ export function TopBar({ syncedAt, offline }: { snap?: Snapshot; syncedAt: numbe
   )
 }
 
-// Profile: who is signed in, Usage & improvement, Switch to Masters, and Sign out. Click or keyboard opens it; Escape or an outside click closes it.
+// Profile: who is signed in, Switch to Masters, and Sign out. Click or keyboard opens it; Escape or an outside click closes it.
 function ProfileMenu() {
   const email = useSession()
   const [open, setOpen] = useState(false)
@@ -93,7 +93,6 @@ function ProfileMenu() {
       </button>
       <div id="profile-menu" className="profile-menu" hidden={!open}>
         <p className="profile-who"><span className="muted xs">Signed in as</span><strong>{email ?? '—'}</strong></p>
-        <button className="profile-item" onClick={() => { close(); navigate(GLOBAL_ROUTES.usage.path) }}><Icon name="gauge" size={14} />Usage &amp; improvement</button>
         <button className="profile-item" onClick={() => { setOpen(false); switchToMasters() }}><Icon name="db" size={14} />Switch to Masters</button>
         <button className="profile-item" onClick={() => { setOpen(false); signOut() }}><Icon name="logout" size={14} />Sign out</button>
       </div>
@@ -210,17 +209,18 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
                       // Workbench and Validation are human-gated: every step shows its state (never looks skipped).
                       const gated = s.parentId === '3' || s.parentId === '4'
                       return (
-                        <li key={s.id} className={s.mode === 'automated' ? 'nv-auto-row' : undefined}>
+                        <li key={s.id} className={s.mode ? 'nv-auto-row' : undefined}>
                           <button className={`nv-item ${current === s.id ? 'on' : ''}`} aria-current={current === s.id ? 'page' : undefined} onClick={() => go(s.id)}
                             title={lock ? `Locked: ${lock}` : s.description} aria-describedby={lock ? `nv-lock-${s.id}` : undefined}>
                             <Icon name={s.icon} size={16} />
-                            <span className="nv-label">{s.label}</span>{s.optional && <span className="nv-opt">optional</span>}{s.mode === 'automated' && <span className="nv-auto-slot" aria-hidden />}
+                            <span className="nv-label">{s.label}</span>{s.optional && <span className="nv-opt">optional</span>}{s.mode && <span className="nv-auto-slot" aria-hidden />}
                             {lock ? <Icon name="lock" size={11} /> : sst === 'done' ? <span className="nv-done" aria-hidden><Icon name="check" size={11} /></span>
                               : gated ? <StepMark st={sst} /> : null}
                             <span className="sr-only">{lock ? '' : `, ${STATUS_LABEL[sst]}`}</span>
                           </button>
                           {/* The chip is focusable, so it sits beside the button (never inside it), over the slot left of the check. */}
                           {s.mode === 'automated' && <AutoChip className={lock || sst === 'done' ? 'nv-auto has-mark' : 'nv-auto'} />}
+                          {s.mode === 'hitl' && <HitlChip className={lock || sst === 'done' ? 'nv-auto has-mark' : 'nv-auto'} />}
                           {lock && <span id={`nv-lock-${s.id}`} className="sr-only">Locked: {lock}</span>}
                         </li>
                       )
