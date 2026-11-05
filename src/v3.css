@@ -137,6 +137,7 @@
 
 /* ---- Results & edits workspace ---- */
 .ws-head h2 { gap: 8px; }
+.ws-back { flex: none; }
 .ws-kicker { text-transform: uppercase; letter-spacing: .08em; }
 .ws-title { font-weight: 600; color: var(--muted); text-transform: none; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-title::before { content: '·'; margin-right: 8px; color: var(--faint); }

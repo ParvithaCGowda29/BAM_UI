@@ -15,7 +15,7 @@ import { useAction } from '../lib/data'
 import { Confirm, Icon, Tip } from '../components/ui'
 import { fdeView } from './IngestionFlow'
 import { UploadIdle } from './UploadIdle'
-import { addFilesLocked, canAddFiles, flowLine, resetGoal, useGoal } from '../lib/goal.ts'
+import { addFilesLocked, canAddFiles, resetGoal, useGoal } from '../lib/goal.ts'
 import { useReviewFiles } from './Standardize'
 
 // ---- entry points --------------------------------------------------------------------------------------------
@@ -244,9 +244,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
   const all = useUploadRows(snap)
   const rows = all.filter(isAdded), failed = all.filter(r => r.state === 'failed')
   const review = useReviewFiles(snap).ids
-  const objective = useUi(s => (s.fdeGoals ?? '').trim())
   const archived = useUi(s => s.archived)
-  const flow = useGoal(s => (s.draft ? flowLine(s.draft.goal) : ''))
   const { busy: acting, run } = useAction()
   const closed = !snap.steps[0].editable
   const busy = rows.some(r => r.state === 'uploading' || r.state === 'checking')
@@ -274,10 +272,6 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
     <main className="up-right" aria-labelledby="center-title">
       <h2 id="center-title" className="sr-only" tabIndex={-1}>Uploaded files</h2>
       {leaving && <UploadIdle leaving />}
-      <section className="up-instr up-flow" aria-label="Workflow"><span className="up-label">Workflow</span>
-        <p>{flow}</p><p className="muted">Ingestion results will appear here.</p></section>
-      <section className="up-instr"><span className="up-label">Instructions</span>
-        <p className={objective ? '' : 'muted'}>{objective || 'Your objective will appear here from the conversation.'}</p></section>
       {/* Failures first, each with its reason always visible and its fix (29 Oct 2026). */}
       {failed.length > 0 && <section className="up-attn" aria-labelledby="up-attn-h">
         <h3 id="up-attn-h" className="up-sec">Needs attention</h3>

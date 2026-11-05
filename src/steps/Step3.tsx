@@ -376,9 +376,12 @@ type Monaco = Parameters<OnMount>[1]
  * Editable Monaco view. With `showChanges` it is an inline diff against `original` (green added, red removed),
  * like the colour coding on the SOW and the grid; the right-hand (current) side is the one you edit.
  */
-export function ReviewEditor({ path, language, original, value, editable, lockedReason, showChanges, onChange, onSave, onReady }: {
+export function ReviewEditor({ path, language, original, value, editable, lockedReason, showChanges, onChange, onSave, onReady, startAtTop }: {
   path: string; language: string; original: string; value: string; editable: boolean; lockedReason: string; showChanges: boolean
   onChange: (v: string) => void; onSave: () => void; onReady?: (e: MonacoEditor, m: Monaco) => void
+  /** Open at the beginning of the file (per user, 5 Nov 2026). Models are reused by path and Monaco restores their
+   *  previous view state, so without this an Approve can land at the end of the file. */
+  startAtTop?: boolean
 }) {
   const theme = useUi(s => s.theme)
   const staging = useUi(s => s.env === 'Staging')
@@ -398,15 +401,21 @@ export function ReviewEditor({ path, language, original, value, editable, locked
     readOnly: !editable, readOnlyMessage: { value: lockedReason }, automaticLayout: true, minimap: { enabled: false }, glyphMargin: true,
     fontSize: 12.5, fontFamily: "'JetBrains Mono', monospace", scrollBeyondLastLine: false, tabSize: language === 'json' ? 2 : 4, insertSpaces: true,
   }
+  const topOf = (e: MonacoEditor) => { e.setScrollTop(0); e.setPosition({ lineNumber: 1, column: 1 }) }
   return showChanges
     ? <DiffEditor key={`diff:${path}`} height="100%" language={language} original={original} modified={value}
         originalModelPath={`base/${path}`} modifiedModelPath={`current/${path}`} beforeMount={defineThemes} theme={editorTheme(theme, staging)}
         // Models are reused by path; letting the wrapper dispose them on unmount races the diff widget.
         keepCurrentOriginalModel keepCurrentModifiedModel
-        onMount={(d, m) => bind(d.getModifiedEditor(), m)} loading={<Skeleton rows={8} label="Loading editor" />}
+        onMount={(d, m) => {
+          bind(d.getModifiedEditor(), m)
+          if (!startAtTop) return
+          topOf(d.getModifiedEditor())
+          const sub = d.onDidUpdateDiff(() => { topOf(d.getModifiedEditor()); sub.dispose() })
+        }} loading={<Skeleton rows={8} label="Loading editor" />}
         options={{ ...options, renderSideBySide: false, originalEditable: false, renderOverviewRuler: false, ignoreTrimWhitespace: false }} />
     : <Editor key={`edit:${path}`} height="100%" language={language} path={`current/${path}`} value={value} beforeMount={defineThemes}
-        theme={editorTheme(theme, staging)} onMount={bind} loading={<Skeleton rows={8} label="Loading editor" />}
+        theme={editorTheme(theme, staging)} onMount={(e, m) => { bind(e, m); if (startAtTop) topOf(e) }} loading={<Skeleton rows={8} label="Loading editor" />}
         options={{ ...options, ariaLabel: `Editor for ${path}` }} />
 }
 
@@ -438,8 +447,9 @@ function CodeView({ files, findings, editable, lockedReason, showChanges, cStatu
     if (done.length) setDrafts(d => { const code = { ...d.code }; for (const p of done) delete code[p]; return { code } })
   }, [files, drafts])
 
+  const focusLine = focus?.file === current?.path ? focus?.line : undefined
   const reveal = () => {
-    const line = focus?.file === current?.path ? focus?.line : undefined
+    const line = focusLine
     deco.current?.clear()
     if (!ed.current || !mon.current || !line) return
     ed.current.revealLineInCenter(line)
@@ -495,7 +505,7 @@ function CodeView({ files, findings, editable, lockedReason, showChanges, cStatu
       {fileFindings.length > 0 && <ul className="findings compact">{fileFindings.map(f => <FindingItem key={f.id} f={f} />)}</ul>}
       <div className="monaco-box">
         {current && <ReviewEditor path={current.path} language="python" original={current.generated} value={draft ?? current.content}
-          editable={editable} lockedReason={lockedReason} showChanges={showChanges}
+          editable={editable} lockedReason={lockedReason} showChanges={showChanges} startAtTop={!focusLine}
           onChange={v => setCodeDraft(current.path, v)} onSave={() => void save()}
           onReady={(e, m) => { ed.current = e; mon.current = m; reveal() }} />}
       </div>
@@ -544,7 +554,7 @@ function ManifestView({ original, baseLabel, current, editable, lockedReason, sh
       {saveError && <Banner tone="err" icon="alert"><strong>Save failed:</strong> {saveError}. Your edits are kept.</Banner>}
       <div className="monaco-box">
         <ReviewEditor path="manifest.json" language="json" original={original} value={draft ?? current} editable={editable} lockedReason={lockedReason}
-          showChanges={showChanges} onChange={v => setDraft(v)} onSave={() => void save()} />
+          showChanges={showChanges} startAtTop onChange={v => setDraft(v)} onSave={() => void save()} />
       </div>
       {editable && (
         <div className="code-actions">

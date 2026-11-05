@@ -18,7 +18,7 @@ import { UploadCount, UploadMenu, useUploadRows } from './steps/UploadPanes'
 import { goalStage, useGoal } from './lib/goal.ts'
 import { MastersPage } from './steps/Global'
 import { ReleasePrep, SkillReview } from './steps/Review'
-import { SCREEN_ROUTES, STEP_SCREEN, globalByPath, screenByPath, screenLabel, stageOf } from './tracker/trackerConfig.ts'
+import { SCREEN_ROUTES, STEP_SCREEN, TASKS, globalByPath, screenByPath, screenLabel, stageOf, subtasksOf } from './tracker/trackerConfig.ts'
 import { AutoContextFooter, QualityFooter, ReviewFooter, SyncFooter, SyncView, useContextAutomation } from './rag/RagSeamless'
 import { RagScreen } from './rag/RagScreens'
 import { ragPipeline, useRag } from './rag/ragPipeline.ts'
@@ -61,6 +61,9 @@ const FOOT: Record<string, (p: { snap: Snapshot; info?: StepInfo }) => React.Rea
   '4.8': p => <Step4.SandboxFooter snap={p.snap} info={p.info!} />, '4.4': p => <Step4.CheckFooter snap={p.snap} info={p.info!} />,
   '4.5': p => <Step4.CertifyFooter snap={p.snap} info={p.info!} />, '4.6': p => <Step4.CommitFooter snap={p.snap} info={p.info!} />,
 }
+// Back button order (5 Nov 2026, per user): the visible screens as the rail lists them; Back opens the previous one.
+const NAV_ORDER = TASKS.flatMap(t => subtasksOf(t.id))
+
 // Ungated screens: always viewable, with honest empty/unavailable states.
 const VIEWS: Record<string, (p: { snap: Snapshot; path: string }) => React.ReactNode> = {
   '1.3': FileDetail, '1.4': IngestionReview, '1.6': Connectors, '1.7': Quarantine, '1.8': StandardizeView, '1.9': ParseView,
@@ -138,6 +141,16 @@ function Workbench() {
   }, [drawer])
   useStageHandoffs(snap)
   useContextAutomation(screen?.id)
+  // Every screen opens at its top (per user, 5 Nov 2026): the workspace scroller is one persistent node, so without
+  // this an Approve landed wherever the previous screen happened to be scrolled - often the end of the page.
+  const wsBody = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = wsBody.current
+    if (!el) return
+    el.scrollTo({ top: 0 })
+    // Pane bodies scroll their own content and their DOM nodes survive a screen change, so reset them too.
+    el.querySelectorAll('.pane-body, .rag').forEach(x => { x.scrollTop = 0 })
+  }, [screen?.id, global])
   useTrackerEvidence(snap)
   Step3.useRunHistory(snap)
   // Pane geometry never changes with the stage (21 Oct 2026, per user): only the person collapses or opens a pane.
@@ -194,6 +207,10 @@ function Workbench() {
   const hint = global ? 'Admin' : screen!.item.description
   // One primary action, pinned below the body; a footer that renders nothing (Review while waiting) draws no bar.
   const foot = screen && FOOT[screen.id] && (info?.state !== 'locked' || templateReady) ? FOOT[screen.id]({ snap, info }) : null
+  // Back goes to the previous screen in the rail order; hidden detail views go back to the screen they belong to.
+  const prev = !screen || global ? undefined
+    : screen.item.hidden && screen.item.navAs ? NAV_ORDER.find(s => s.id === screen.item.navAs)
+    : NAV_ORDER[NAV_ORDER.findIndex(s => s.id === screen.id) - 1]
   return (
     <div className="app" data-env={env}>
       <a className="skip" href="#ws-title">Skip to screen content</a>
@@ -208,10 +225,10 @@ function Workbench() {
           <header className="shell-head ws-head">
             {screen?.id === '1.1'
               ? <UploadHead snap={snap} />
-              : <><h2 id="ws-title" tabIndex={-1}><Icon name="table" size={13} /><span className="ws-kicker">Results &amp; edits</span><span className="ws-title">{title}</span></h2>{screen?.item.mode === 'automated' && <AutoChip className="ws-auto" />}{screen?.item.mode === 'hitl' && <HitlChip className="ws-auto" />}
+              : <>{prev && <button className="icon-btn sm ws-back" onClick={() => goScreen(prev.id, true)} title={`Back to ${prev.label}`} aria-label={`Back to ${prev.label}`}><Icon name="back" size={14} /></button>}<h2 id="ws-title" tabIndex={-1}><Icon name="table" size={13} /><span className="ws-kicker">Results &amp; edits</span><span className="ws-title">{title}</span></h2>{screen?.item.mode === 'automated' && <AutoChip className="ws-auto" />}{screen?.item.mode === 'hitl' && <HitlChip className="ws-auto" />}
                 <span className="ws-hint" title={hint}>{hint}</span></>}
           </header>
-          <div className="ws-body">{body}</div>
+          <div className="ws-body" ref={wsBody}>{body}</div>
           {/* One primary action, pinned below the scrolling body (never scrolled to). */}
           {foot && <footer className="ws-foot">{foot}</footer>}
         </section>

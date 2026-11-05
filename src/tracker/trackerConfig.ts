@@ -52,7 +52,7 @@ const screen = (id: string, parentId: string, label: string, icon: string, path:
 // Admin is a global destination (GLOBAL_ROUTES), not a workflow screen.
 export const TRACKER_ITEMS: readonly TrackerItem[] = [
   stage('1', 'Ingestion', 'tb-inbox', 'Add the source documents, standardize and parse them, then confirm what goes to Context.'),
-  screen('1.1', '1', 'Upload', 'tb-upload', '/ingestion/upload', 'Choose source files and track upload readiness.', { step: 1 }),
+  screen('1.1', '1', 'Upload', 'tb-upload', '/ingestion/upload', 'Choose source files and track upload readiness.', { step: 1, mode: 'hitl' }),
   screen('1.8', '1', 'Standardize', 'tb-transform', '/ingestion/standardize', 'Classify each file, keep the original, flag problems and decide: ready, local AI fix or manual review.', { mode: 'automated' }),
   screen('1.9', '1', 'Parse', 'tb-file-code', '/ingestion/parse', 'Extract text, tables and structure from the ready files.', { mode: 'automated' }),
   screen('1.4', '1', 'Review', 'tb-clipboard-check', '/ingestion/review', 'Confirm the accepted, parsed files that go to Context. Not SOW approval.', { mode: 'hitl' }),
@@ -71,7 +71,7 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   stage('3', 'Workbench', 'tb-briefcase', 'Approve the scope, review the skills grid, then the manifest and the translated code.'),
   screen('3.1', '3', 'Scope', 'tb-target', '/workbench/sow', 'SOW review and FDE approval.', { step: 1, mode: 'hitl' }),
   screen('3.2', '3', 'Grid', 'tb-table', '/workbench/skills', 'Agent > Skill review with all seven ISATVON fields.', { step: 2, mode: 'hitl' }),
-  screen('4.2', '3', 'Template', 'tb-template', '/workbench/manifest', 'manifest.json, linked to the approved Scope and Grid.', { step: 3 }),
+  screen('4.2', '3', 'Template', 'tb-template', '/workbench/manifest', 'manifest.json, linked to the approved Scope and Grid.', { step: 3, mode: 'hitl' }),
   screen('4.3', '3', 'Translate', 'tb-code', '/workbench/code', 'Translation: the translated skill code and its translation check.', { step: 3, mode: 'hitl' }),
   screen('3.3', '3', 'Skill review', 'eye', '/workbench/review', 'One skill at a time: its contract, generated code diff and review findings (read-only).', { hidden: true, navAs: '3.2' }),
   screen('3.4', '3', 'Release prep', 'checklist', '/workbench/release', 'Manifest version, release prerequisites and version history.', { hidden: true, navAs: '4.3' }),

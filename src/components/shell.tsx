@@ -103,9 +103,11 @@ function ProfileMenu() {
 const STAGE_TEXT: Record<TrackerStatus, string> = { not_started: 'Waiting', in_progress: 'In progress', needs_review: 'Needs review', done: 'Done', blocked: 'Blocked' }
 
 /** NAVIGATE: the four workflow stages and their screens (icon + label, no numbers). The only workflow navigation. */
-/** A Workbench / Validation step's state in the rail: Ready (dot) · Running (spinner) · Needs review · Failed. Done is the check. */
+/** A Workbench / Validation step's state in the rail: Ready (dot) · Running (spinner) · Failed. Done is the check.
+ *  Needs review shows no mark and locked steps no lock icon (per user, 5 Nov 2026); the lock reason stays in the tooltip. */
 function StepMark({ st }: { st: TrackerStatus }) {
-  const [icon, cls, label] = st === 'in_progress' ? ['spinner', 'nv-st-run', 'Running'] : st === 'needs_review' ? ['eye', 'nv-st-review', 'Needs review']
+  if (st === 'needs_review') return null
+  const [icon, cls, label] = st === 'in_progress' ? ['spinner', 'nv-st-run', 'Running']
     : st === 'blocked' ? ['alert', 'nv-st-fail', 'Failed'] : ['dot', 'nv-st-ready', 'Ready']
   return <span className={`nv-st ${cls}`} title={label} aria-hidden><Icon name={icon} size={11} spin={icon === 'spinner'} /></span>
 }
@@ -188,8 +190,7 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
             {TASKS.map((t, i) => {
               const st = taskStatus(t.id, statuses)
               const isOpen = open.has(t.id)
-              const firstLock = lockOf(subtasksOf(t.id)[0]?.id)
-              const here = currentStage === t.id
+                            const here = currentStage === t.id
               return (
                 <li key={t.id} className={`nv-stage s-${st} ${here ? 'here' : ''}`}>
                   {i < TASKS.length - 1 && <span className="nv-line" aria-hidden />}
@@ -199,7 +200,7 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
                       {i === active && st !== 'blocked' && <span className="nv-active" />}</span>
                     <span className="nv-stage-text">
                       <span className="nv-stage-name">{t.label}{i === active && <span className="sr-only">, current stage</span>}</span>
-                      <span className="nv-stage-status">{st === 'needs_review' ? <Icon name="eye" size={11} /> : null}{STAGE_TEXT[st]}{st === 'not_started' && firstLock ? <Icon name="lock" size={11} label="locked" /> : null}</span>
+                      <span className="nv-stage-status">{STAGE_TEXT[st]}</span>
                     </span>
                   </button>
                   <ul id={`nv-group-${t.id}`} className="nv-items" hidden={!isOpen}>
@@ -214,13 +215,13 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
                             title={lock ? `Locked: ${lock}` : s.description} aria-describedby={lock ? `nv-lock-${s.id}` : undefined}>
                             <Icon name={s.icon} size={16} />
                             <span className="nv-label">{s.label}</span>{s.optional && <span className="nv-opt">optional</span>}{s.mode && <span className="nv-auto-slot" aria-hidden />}
-                            {lock ? <Icon name="lock" size={11} /> : sst === 'done' ? <span className="nv-done" aria-hidden><Icon name="check" size={11} /></span>
-                              : gated ? <StepMark st={sst} /> : null}
+                            {sst === 'done' ? <span className="nv-done" aria-hidden><Icon name="check" size={11} /></span>
+                              : !lock && gated ? <StepMark st={sst} /> : null}
                             <span className="sr-only">{lock ? '' : `, ${STATUS_LABEL[sst]}`}</span>
                           </button>
                           {/* The chip is focusable, so it sits beside the button (never inside it), over the slot left of the check. */}
-                          {s.mode === 'automated' && <AutoChip className={lock || sst === 'done' ? 'nv-auto has-mark' : 'nv-auto'} />}
-                          {s.mode === 'hitl' && <HitlChip className={lock || sst === 'done' ? 'nv-auto has-mark' : 'nv-auto'} />}
+                          {s.mode === 'automated' && <AutoChip className={sst === 'done' ? 'nv-auto has-mark' : 'nv-auto'} />}
+                          {s.mode === 'hitl' && <HitlChip className={sst === 'done' ? 'nv-auto has-mark' : 'nv-auto'} />}
                           {lock && <span id={`nv-lock-${s.id}`} className="sr-only">Locked: {lock}</span>}
                         </li>
                       )
