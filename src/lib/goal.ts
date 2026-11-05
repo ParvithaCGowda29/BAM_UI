@@ -9,7 +9,7 @@ import { useSyncExternalStore } from 'react'
 export interface Goal { what: string; who: string; where: string }
 export const KEYS = ['I', 'S', 'A', 'T', 'V', 'O', 'N'] as const
 export type Key = typeof KEYS[number]
-export const SECTION: Record<Key, string> = { I: 'Instructions', S: 'Source data', A: 'Automation', T: 'Tech Stack', V: 'Variables', O: 'Outcome', N: 'Notify on next' }
+export const SECTION: Record<Key, string> = { I: 'Instructions', S: 'Source data', A: 'Automation', T: 'Tech Stack', V: 'Variables', O: 'Outcome', N: 'Next' }
 export interface Upload { name: string; hint: string; required: boolean; match: RegExp }
 /** Sections hold inner HTML (the output editor keeps formatting); `base` is the generated version ("what changed"). */
 export interface Draft { goal: Goal; quote: boolean; title: string; subtitle: string; sections: Record<Key, string>; base: Record<Key, string>; uploads: Upload[]
@@ -109,7 +109,10 @@ export const flowLine = (g: Goal) => profileOf(g).flow
 
 export function expandGoal(g: Goal): Draft {
   const p = profileOf(g)
-  const sections: Record<Key, string> = { I: p.I, S: p.S, A: p.A,
+    // The Source names its mandatory files (5 Nov 2026): the profile's required uploads, so the goal says what must be added.
+  const mandatory = p.uploads.filter(u => u.required).map(u => u.name)
+  const source = p.S.replace(/\.?\s*Supporting files to be uploaded next\.$/, '') + `. Mandatory files: ${mandatory.slice(0, -1).join(', ')}${mandatory.length > 1 ? ' and ' : ''}${mandatory[mandatory.length - 1]}. Supporting files to be uploaded next.`
+  const sections: Record<Key, string> = { I: p.I, S: source, A: p.A,
     T: 'Use approved tools from the project context. Connections and tool choices need validation.',
     V: p.V, O: p.O,
     N: `Notify ${owner(g.who)} of missing inputs or ${p.ready} ready for review. Define delivery channels before use.` }
@@ -170,7 +173,7 @@ export function draftReply(d: Draft, text: string, uploaded: string[]): string |
   const u = into && d.uploads.find(x => x.name.toLowerCase() === into[1].trim().toLowerCase())
   if (u) return `${u.name}: ${u.hint.charAt(0).toLowerCase()}${u.hint.slice(1)}. ${u.required ? 'It is required' : 'It is optional'}; any file whose name says what it holds (for example ${u.name.toLowerCase().replace(/\s+/g, '-')}.pdf) is matched.`
   if (/what does isatvon mean/i.test(text))
-    return 'ISATVON is the seven-part contract for each skill: Instructions, Source data, Automation, Tech Stack, Variables, Outcome and Notify on next. The draft above fills each part for your goal.'
+    return 'ISATVON is the seven-part contract for each skill: Instructions, Source data, Automation, Tech Stack, Variables, Outcome and Next. The draft above fills each part for your goal.'
   if (/what files should i add/i.test(text)) {
     const need = d.uploads.filter(u => u.required)
     return `I need: ${need.map(u => `${u.name} (${u.hint.charAt(0).toLowerCase()}${u.hint.slice(1)})`).join(', ')}. Add them on the left; I match them by file name.`

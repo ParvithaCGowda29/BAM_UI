@@ -129,7 +129,7 @@ export const ISATVON = [
   { key: 'variables', letter: 'V', label: 'Variables' },
   { key: 'outcome', letter: 'O', label: 'Outcome' },
   // Display label only: the serialized key stays `notifications` so saved contracts keep loading.
-  { key: 'notifications', letter: 'N', label: 'Notify on next' },
+  { key: 'notifications', letter: 'N', label: 'Next' },
 ] as const
 
 export type IsatvonField = (typeof ISATVON)[number]['key']

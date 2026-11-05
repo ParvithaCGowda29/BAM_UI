@@ -8,7 +8,7 @@ export type RequirementFields = Record<IsatvonField, string>
 /** SOW-format labels, in ISATVON order. */
 export const SOW_LABELS: Record<IsatvonField, string> = {
   instructions: 'I — Instructions', sourceData: 'S — Source Data', automation: 'A — Automation', techStack: 'T — Tech Stack',
-  variables: 'V — Variables', outcome: 'O — Outcome', notifications: 'N — Notify on next',
+  variables: 'V — Variables', outcome: 'O — Outcome', notifications: 'N — Next',
 }
 /** Fields rendered as code in the SOW, like the sample. */
 const CODE_FIELDS: IsatvonField[] = ['sourceData', 'automation', 'variables']

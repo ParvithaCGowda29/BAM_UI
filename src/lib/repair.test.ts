@@ -18,14 +18,14 @@ const until = async (cond: () => Promise<boolean>) => {
 const noRag = { runId: undefined, steps: [] }
 const ragDone = { runId: 'rag-1', steps: [{ key: 'chunk' as const, label: 'Chunk + embed', status: 'done' as const }] }
 
-test('ISATVON: confirmed display names; N = Notify on next; serialized keys unchanged', () => {
+test('ISATVON: display names; N = Next (5 Nov 2026); serialized keys unchanged', () => {
   assert.deepEqual(ISATVON.map(c => `${c.letter}=${c.label}`), [
-    'I=Instructions', 'S=Source data', 'A=Automation', 'T=Tech stack', 'V=Variables', 'O=Outcome', 'N=Notify on next'])
+    'I=Instructions', 'S=Source data', 'A=Automation', 'T=Tech stack', 'V=Variables', 'O=Outcome', 'N=Next'])
   assert.equal(ISATVON[6].key, 'notifications', 'contract key kept for saved records')
-  assert.equal(SOW_LABELS.notifications, 'N — Notify on next')
+  assert.equal(SOW_LABELS.notifications, 'N — Next')
   assert.ok(!/Verification|Output|Notifications/.test(ISATVON.map(c => c.label).join()), 'no older mockup names')
   // Saved SOWs that still say "N — Notifications" keep parsing (by letter).
-  const legacy = renderSowHtml(RFQ_REQUIREMENTS.slice(0, 1)).replace('N — Notify on next', 'N — Notifications')
+  const legacy = renderSowHtml(RFQ_REQUIREMENTS.slice(0, 1)).replace('N — Next', 'N — Notifications')
   assert.equal(parseRequirements(legacy)[0].fields.notifications, RFQ_REQUIREMENTS[0].notifications)
 })
 

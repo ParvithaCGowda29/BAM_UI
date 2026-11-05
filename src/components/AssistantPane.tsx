@@ -1,7 +1,8 @@
 // Enterprise Assistant (middle pane), built on assistant-ui primitives with a local runtime. The thread lives for the
 // whole session and is never keyed by screen, so navigating keeps the conversation. Declutter (14 Oct 2026): the pane
-// is only the thread and the composer (input, Dictate, send). One short live message per screen sits at the top of
-// the thread; on Ingestion screens the intake objective is captured through the composer and stored exactly as before
+// is only the thread and the composer (input, Dictate, send). The chat holds no unprompted status notes
+// (5 Nov 2026): an assistant message only answers something the person asked; the live screen note sits in the empty
+// thread's greeting instead. On Ingestion screens the intake objective is captured through the composer and stored exactly as before
 // (`fdeGoals`, used by SOW generation). Replies come from live workflow state (lib/assistant.ts); nothing here
 // approves, certifies, hands over or deploys.
 // Chat layout (22 Oct 2026, assistant pane design): ChatGPT-style thread. Empty = greeting + composer + starter chips;
@@ -25,9 +26,10 @@ import { intakeChecks, useSufficiency } from '../steps/IngestionFlow'
 import { relations, ragPipeline } from '../rag/ragPipeline.ts'
 import { JOBS, NODES, SCHEMAS } from '../rag/mockData.ts'
 import { useReadiness } from '../rag/RagSeamless'
-import { GATE, askQuestion, isAsked, sufficiency, useChecks, useRunState, type Row } from '../rag/contextQuestions'
+import { askQuestion, useChecks, useRunState, type Row } from '../rag/contextQuestions'
 import { Icon, Tip, fmtBytes } from './ui'
 import Orb from './reactbits/Orb'
+import bull from '../assets/login/bull-head-transparent.png'
 import { UploadMessages, fileCounts, useUploadRows } from '../steps/UploadPanes'
 import { GoalCapture, GoalExpansion } from '../steps/GoalPanes'
 import { applyEdit, conversationChips, draftReply, getGoal, setGoal, useGoal, type Draft } from '../lib/goal.ts'
@@ -41,7 +43,6 @@ const chatFiles: AttachmentAdapter = {
   async send(a) { return { ...a, status: { type: 'complete' }, content: [] } },
   async remove() {},
 }
-const HELPER = 'Pack files added on the left go through the stages. Chat attachments are for questions only.'
 const ScreenCtx = createContext<string | undefined>(undefined)
 // The message awaiting Yes / No on "Save this as your intake objective?" (the buttons only show on that message).
 const ConfirmCtx = createContext<string | null>(null)
@@ -54,8 +55,6 @@ const ConfirmCtx = createContext<string | null>(null)
 const projectOf = (_snap: Snapshot) => 'default'
 const threads = new Map<string, ExportedMessageRepository>()
 /** Per project: stage events already in its thread (screen updates, Verify run results, upload summaries). */
-const postedEvents = new Map<string, Set<string>>()
-const postedFor = (project: string) => { let s = postedEvents.get(project); if (!s) postedEvents.set(project, s = new Set()); return s }
 /** Per project: upload record ids already acknowledged with "Files added." (see the effect in AssistantPane). */
 const ackedIds = new Map<string, Set<string>>()
 const ackedFor = (project: string) => { let s = ackedIds.get(project); if (!s) ackedIds.set(project, s = new Set()); return s }
@@ -187,40 +186,10 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
     shownProject.current = project
   }, [project, runtime])
   // Upload progress and "files added" are not posted in chat (4 Nov 2026): the files and outputs panes hold every count and reason.
-  // A reply is streaming: stage events wait until it finishes, so they land after it, in order.
-  const replying = useSyncExternalStore(cb => runtime.thread.subscribe(cb), () => runtime.thread.getState().isRunning)
-  const post = (key: string, text: string) => {
-    const posted = postedFor(project)
-    if (posted.has(key)) return
-    posted.add(key)
-    void runtime.thread.append({ role: 'assistant', content: [{ type: 'text', text }], metadata: { custom: { event: key } } })
-  }
-  // Opening a screen posts its update once (same screen + same text = already said; a changed state on a revisit is
-  // new). Upload has none (its goal capture and upload summary speak for it); Verify adds its sample list while idle.
+  // The live screen note (5 Nov 2026): shown in the empty thread's greeting, never posted as a chat message.
   const note = screenNote(facts)
-  const runState = useRunState()
-  useEffect(() => {
-    if (!screenId || screenId === '1.1' || replying) return
-    const samples = screenId === '2.3' && runState.phase === 'idle' ? (pre as Row[]).filter(r => !isAsked(r)) : []
-    post(`screen:${screenId}:${note}`, samples.length
-      ? `${note}\nI will run these ${samples.length} sample questions against the graph. You can also ask your own below. Each answer comes back with its source.\n${samples.map(q => `• ${q.question}`).join('\n')}`
-      : note)
-  }, [screenId, replying, project])
-  // Verify: a finished sample run becomes one message (result, failed answers, gate line). The result already on screen
-  // when the pane mounts (a reload) is not news, so it is not posted.
-  const runResult = useMemo(() => {
-    if (runState.phase !== 'done' || runState.running) return null
-    const rows = pre as Row[], inRun = runState.order.map(id => rows.find(r => r.id === id)).filter((r): r is Row => !!r)
-    const samples = rows.filter(r => !isAsked(r)), passed = samples.filter(r => r.status === 'passed').length, failed = inRun.filter(r => r.status === 'flagged')
-    const pct = sufficiency(rows)
-    const text = [`Sample set done: ${passed} of ${samples.length} passed. ${failed.length ? `${failed.length} answer${failed.length === 1 ? ' needs' : 's need'} a fix.` : 'Ask anything else you want checked.'}`,
-      ...failed.map(q => `${q.question} ${q.answer}`),
-      pct < GATE ? 'Check the failed questions in the right pane, fix the input, then test again.'
-        : failed.length ? 'You can continue to Scope. Review the failed answer and its missing source first.' : 'Every answer cites its source. You can continue to Scope.'].join('\n')
-    return { key: `verify-run:${inRun.map(r => `${r.id}=${r.status}`).join(',')}`, text }
-  }, [runState, pre])
-  const initialRun = useRef(runResult?.key)
-  useEffect(() => { if (runResult && !replying && runResult.key !== initialRun.current) post(runResult.key, runResult.text) }, [runResult?.key, replying, project])
+  // Verify (5 Nov 2026): a finished run is not posted in chat - chat only answers questions a person asks.
+  // The sample results, failed answers and the gate line stay in the Verify panes.
   const toggle = () => setUi(s => ({ shell: { ...s.shell, assistant: !s.shell.assistant } }))
   // Upload: the goal's state beside the title, and chips generated from the draft while it is the output on screen.
   const goal = useGoal(s => s)
@@ -446,10 +415,9 @@ function AssistantMessage() {
   const empty = useAuiState(({ message }) => !message.content.some(p => p.type === 'text' && p.text))
   const custom = useAuiState(({ message }) => message.metadata?.custom) as { source?: string; failed?: boolean; confirm?: string } | undefined
   const pending = useContext(ConfirmCtx)
-  const isLast = useAuiState(({ message }) => message.isLast)
   const screen = useContext(ScreenCtx)
   const running = status === 'running'
-  const avatar = <span className="as-avatar" aria-hidden>B</span>
+  const avatar = <span className="as-avatar" aria-hidden><img src={bull} alt="" /></span>
   if (running && empty) return <MessagePrimitive.Root className="as-arow">{avatar}<div className="as-abody">{screen === '2.3' ? <Searching /> : <Generating />}</div></MessagePrimitive.Root>
   return <MessagePrimitive.Root className="as-arow">{avatar}<div className="as-abody">
     <div className={`as-msg as-bot${custom?.failed ? ' as-fail' : ''}`}><MessagePrimitive.Parts components={{ Text: ReplyText }} />{custom?.source && <Source label={custom.source} />}
@@ -460,7 +428,6 @@ function AssistantMessage() {
     </span>}</div>
     {/* No action bar under replies (29 Oct 2026, per user). */}
     {running && <Generating />}
-    {isLast && !running && <p className="as-helper">{HELPER}</p>}
   </div></MessagePrimitive.Root>
 }
 

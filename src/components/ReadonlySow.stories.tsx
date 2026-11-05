@@ -14,7 +14,7 @@ const SOW_HTML = [
     ['T — Tech stack', 'Context Engine, PostgreSQL'],
     ['V — Variables', 'currency: USD; max_parts: 200'],
     ['O — Outcome', 'PartList JSON: part_no, qty, due_date'],
-    ['N — Notify on next', 'Notify the estimator when the part list is ready'],
+    ['N — Next', 'Notify the estimator when the part list is ready'],
   ]),
   req(2, 'Cost each PCBA', [
     ['I — Instructions', 'Cost each PCBA from the BOM and the machine hour rates.'],
@@ -23,7 +23,7 @@ const SOW_HTML = [
     ['T — Tech stack', 'Python, PostgreSQL'],
     ['V — Variables', 'margin: 0.18'],
     ['O — Outcome', 'CostBreakdown JSON'],
-    ['N — Notify on next', 'Route to the commercial manager for approval'],
+    ['N — Next', 'Route to the commercial manager for approval'],
   ]),
   '<h2>Approval</h2><p>Any material change to scope requires a change order and re-approval before implementation proceeds.</p>',
 ].join('')

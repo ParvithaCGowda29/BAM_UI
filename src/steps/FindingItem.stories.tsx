@@ -23,5 +23,5 @@ type Story = StoryObj<typeof meta>
 export const ErrorFinding: Story = {}
 export const WarningFinding: Story = { args: { f: { id: 'F-13', severity: 'warning', message: 'Outcome "CostBreakdown JSON" has no schema version.', skillId: 'SK-004', line: 12 } } }
 export const Resolved: Story = { args: { f: { id: 'F-09', severity: 'error', message: 'Source data "BOM.xlsx" is not a storage URI.', skillId: 'SK-004', resolved: true } } }
-export const FileFromSkill: Story = { args: { f: { id: 'F-14', severity: 'warning', message: 'Notify on next has no recipient for failures.', skillId: 'SK-004' } } }
+export const FileFromSkill: Story = { args: { f: { id: 'F-14', severity: 'warning', message: 'Next has no recipient for failures.', skillId: 'SK-004' } } }
 export const NoReference: Story = { args: { f: { id: 'F-15', severity: 'error', message: 'Dependency "pandas" is not pinned to a version.' }, files: undefined } }

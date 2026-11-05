@@ -91,7 +91,7 @@ export function GoalExpansion() {
   const save = (k: typeof KEYS[number], v: string) => setGoal(s => s.draft && plain(s.draft.sections[k]) !== v.trim() ? { draft: { ...s.draft, sections: { ...s.draft.sections, [k]: esc(v.trim()) } } } : {})
   return <>
     <div className="as-urow"><div className="as-uline"><div className="as-msg as-user"><p>{text || draft.goal.what}</p></div></div></div>
-    <div className="as-arow"><span className="as-avatar" aria-hidden>B</span><div className="as-abody"><div className="as-msg as-bot goal-draft" key={draft.rev}>
+    <div className="as-arow"><span className="as-avatar" aria-hidden><img src={bull} alt="" /></span><div className="as-abody"><div className="as-msg as-bot goal-draft" key={draft.rev}>
       <p className="goal-draft-title"><strong>{draft.title}</strong><span>{draft.subtitle}</span></p>
       <dl className="goal-rows">{KEYS.map(k => <div key={k} className="goal-row"><dt><code>{k}</code>{SECTION[k]}</dt>
         <dd contentEditable suppressContentEditableWarning spellCheck role="textbox" aria-label={`${SECTION[k]} (editable)`}

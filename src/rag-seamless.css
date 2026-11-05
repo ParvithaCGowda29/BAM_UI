@@ -24,7 +24,7 @@
 /* Schemas */
 .rs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .rs-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text); }
-.rs-chip[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.rs-chip[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-txt); }
 .rs-chip .icon { color: var(--ok); }
 .rs-title { display: flex; align-items: center; gap: 8px; }
 .rs-title strong { font-size: 14px; }
@@ -67,8 +67,8 @@
 .cq-row .dc-pill:not([class*="tone-"]) { color: var(--muted); }
 /* Assistant thread on Context quality (same store as the list). */
 .as-q { display: flex; align-items: flex-start; gap: 8px; }
-.as-q > .icon { margin-top: 3px; flex: none; color: var(--accent); }
-.as-src { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 12px; white-space: normal; }
+.as-q > .icon { margin-top: 3px; flex: none; color: var(--accent-txt); }
+.as-src { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-txt); font-size: 12px; white-space: normal; }
 .as-msg.as-fail { border: 1px solid var(--err); }
 .as-wait { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .assist[data-screen="2.3"] .as-msg > p, .assist[data-screen="1.1"] .as-msg > p { margin: 0; }

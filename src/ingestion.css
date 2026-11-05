@@ -7,7 +7,7 @@
 .ing-head h2 { font-size: 16px; font-weight: 700; }
 .ing-ov { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
 .ing-ov-main { display: flex; align-items: flex-start; gap: 12px; }
-.ing-ov-main > .icon { color: var(--accent); margin-top: 2px; }
+.ing-ov-main > .icon { color: var(--accent-txt); margin-top: 2px; }
 .ing-ov h3 { font-size: 14px; font-weight: 700; }
 .ing-ov p { margin: 2px 0 0; }
 .ing-ov.tone-err .ing-ov-main > .icon { color: var(--err); }
@@ -17,7 +17,7 @@
 .ing-sec { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .ing-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; }
 .ing-sec-head h3 { font-size: 14px; font-weight: 700; }
-.ing-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 16px; text-align: center; color: var(--accent);
+.ing-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 16px; text-align: center; color: var(--accent-txt);
   border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); transition: border-color .15s, background .15s; }
 .ing-drop strong { color: var(--text); font-size: 14px; margin-top: 4px; }
 .ing-drop .btn { margin-top: 8px; min-width: 140px; justify-content: center; }
@@ -35,7 +35,7 @@
 .ing-expand > td { background: var(--surface-2); padding: 10px 12px; }
 .ing-expand .kv { margin-bottom: 8px; }
 .ing-sec-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
-.ing-sec-card > .icon { color: var(--accent); margin-top: 1px; }
+.ing-sec-card > .icon { color: var(--accent-txt); margin-top: 1px; }
 .ing-sec-main { flex: 1; min-width: 0; }
 .ing-sec-main h3 { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ing-sec-main p { margin: 2px 0 0; }
@@ -58,7 +58,7 @@
 .ia-head h3 { font-size: 14px; font-weight: 700; }
 .ia-head p { margin: 2px 0 0; }
 .ia-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 8px 4px; text-align: center; }
-.ia-empty > .icon { color: var(--accent); }
+.ia-empty > .icon { color: var(--accent-txt); }
 .ia-empty strong { font-size: 14px; max-width: 260px; }
 .ia-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
 .ia-card h3 { font-size: 14px; font-weight: 700; }
@@ -69,7 +69,7 @@
 .ia-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
 .ia-links { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .ia-links > .ia-disclose { width: 100%; }
-.ia-disclose > summary { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 600; font-size: 12px; min-height: 28px; }
+.ia-disclose > summary { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-txt); font-weight: 600; font-size: 12px; min-height: 28px; }
 .ia-empty .ia-disclose { display: flex; flex-direction: column; align-items: center; }
 .ia-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; justify-content: center; }
 .ia-links .ia-chips { justify-content: flex-start; }
@@ -91,7 +91,7 @@
 /* Uppy Dashboard in Review your selection: Uppy's own UI, coloured with the app tokens. */
 .bam-uppy .uppy-Dashboard-inner { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; }
 .bam-uppy .uppy-Dashboard-AddFiles { border-color: var(--border-strong); }
-.bam-uppy .uppy-Dashboard-browse, .bam-uppy .uppy-DashboardContent-addMore, .bam-uppy .uppy-DashboardContent-back { color: var(--accent); }
+.bam-uppy .uppy-Dashboard-browse, .bam-uppy .uppy-DashboardContent-addMore, .bam-uppy .uppy-DashboardContent-back { color: var(--accent-txt); }
 .bam-uppy .uppy-Dashboard-browse:hover, .bam-uppy .uppy-DashboardContent-addMore:hover { border-bottom-color: var(--accent); }
 .bam-uppy .uppy-DashboardContent-bar { background: var(--surface); border-bottom-color: var(--border); }
 .bam-uppy .uppy-DashboardContent-title { color: var(--text); }
@@ -99,12 +99,12 @@
 .bam-uppy .uppy-Dashboard-Item-name { color: var(--text); }
 .bam-uppy .uppy-Dashboard-Item-status, .bam-uppy .uppy-Dashboard-note { color: var(--muted); }
 .bam-uppy .uppy-Dashboard-Item-action--remove { color: var(--err); }
-.bam-uppy .uppy-Dashboard-dropFilesHereHint { border-color: var(--accent); color: var(--accent); }
+.bam-uppy .uppy-Dashboard-dropFilesHereHint { border-color: var(--accent); color: var(--accent-txt); }
 /* Our bar above the Dashboard already has Clear and the count: keep only Uppy's "Add more" in its bar. */
 .bam-uppy.bam-uppy .uppy-DashboardContent-back, .bam-uppy.bam-uppy .uppy-DashboardContent-title { display: none; }
 .bam-uppy.bam-uppy .uppy-DashboardContent-bar { background: var(--surface); border-bottom: 1px solid var(--border); justify-content: flex-end; }
 .bam-uppy.bam-uppy .uppy-Dashboard-inner, .bam-uppy.bam-uppy .uppy-Dashboard-files, .bam-uppy.bam-uppy .uppy-Dashboard-AddFiles { background: var(--surface-2); }
-.bam-uppy.bam-uppy .uppy-DashboardContent-addMore { color: var(--accent); }
+.bam-uppy.bam-uppy .uppy-DashboardContent-addMore { color: var(--accent-txt); }
 .bam-uppy.bam-uppy .uppy-Dashboard-Item-name { color: var(--text); }
 /* Rejected list (Upload) and the two scan engines (Scan). */
 .ing-rej { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--err); border-radius: 10px; background: var(--err-soft); }
