@@ -15,11 +15,12 @@ import { tips } from '../lib/actionTips'
 ModuleRegistry.registerModules([AllCommunityModule])
 
 // One token set drives both themes: the grid reads the same CSS variables as the app.
+// Editable-grid look and feel matched to Masters: 14px Inter cells, 16px headers, airier row padding, 15px cell gutters.
 export const gridTheme = themeQuartz.withParams({
   backgroundColor: 'var(--surface)', foregroundColor: 'var(--text)', headerBackgroundColor: 'var(--surface-2)',
   chromeBackgroundColor: 'var(--surface-2)', borderColor: 'var(--border)', accentColor: 'var(--accent)',
   rowHoverColor: 'var(--hover)', selectedRowBackgroundColor: 'var(--accent-soft)', fontFamily: 'inherit',
-  fontSize: 13, headerFontWeight: 600, spacing: 6, wrapperBorderRadius: 8, cellHorizontalPadding: 10,
+  fontSize: 14, headerFontSize: 16, headerFontWeight: 600, rowVerticalPaddingScale: 1.2, wrapperBorderRadius: 8, cellHorizontalPadding: 15,
 })
 
 type GroupRow = { kind: 'group'; id: string; agent: string; count: number; errors: number }
@@ -196,8 +197,6 @@ const shiftEnterInEditor = (p: { editing: boolean; event: KeyboardEvent }) => p.
 // makes AG Grid redraw its rows, which cancels an open cell editor.
 const DEFAULT_COL: ColDef<Row> = { resizable: true, sortable: false, wrapText: true, suppressMovable: true }
 const getRowId = (p: { data: Row }) => p.data.id
-// The cell preview (tooltip) floats over the page, kept inside the viewport, instead of inside the grid's clipped area.
-const POPUP_PARENT = typeof document === 'undefined' ? undefined : document.body
 const isFullWidthRow = (p: { rowNode: { data?: Row } }) => p.rowNode.data?.kind === 'group' || p.rowNode.data?.kind === 'detail'
 const getRowHeight = (p: { data?: Row }) => (p.data?.kind === 'group' ? 40 : p.data?.kind === 'detail' ? 470 : undefined)
 /** Inline editing keeps the existing text: put the cursor at the end instead of selecting (and replacing) everything. */
@@ -244,7 +243,6 @@ export function SkillGrid({ rows, setRows, editable, showChanges, onLockedEdit }
     ...ISATVON.map((c): ColDef<Row> => ({
       colId: c.key, headerName: `${c.letter} · ${c.label}`, headerTooltip: `${c.letter} = ${c.label}`, minWidth: c.key === 'instructions' ? 280 : c.key === 'automation' ? 240 : 200, flex: c.key === 'instructions' ? 2 : 1,
       editable: p => editable && p.data?.kind === 'skill',
-      tooltipValueGetter: p => p.data?.kind === 'skill' ? p.data.fields[c.key] : undefined,
       valueGetter: p => p.data?.kind === 'skill' ? p.data.fields[c.key] : '',
       valueSetter: p => { if (p.data.kind !== 'skill') return false; p.data.fields = { ...p.data.fields, [c.key]: p.newValue ?? '' }; return true },
       cellRenderer: IsatvonCell, autoHeight: true,
@@ -299,7 +297,7 @@ export function SkillGrid({ rows, setRows, editable, showChanges, onLockedEdit }
       <AgGridReact<Row>
         theme={gridTheme} rowData={data} columnDefs={columns} context={context}
         getRowId={getRowId} isFullWidthRow={isFullWidthRow} fullWidthCellRenderer={FullWidthCell} getRowHeight={getRowHeight}
-        tooltipShowDelay={400} tooltipInteraction popupParent={POPUP_PARENT}
+        headerHeight={46} tooltipShowDelay={400}
         defaultColDef={DEFAULT_COL}
         undoRedoCellEditing stopEditingWhenCellsLoseFocus enterNavigatesVerticallyAfterEdit
         onGridReady={e => { gridApi.current = e.api; wrap.current?.querySelector('.ag-body-horizontal-scroll-viewport')?.setAttribute('aria-label', 'Scroll columns') }}
