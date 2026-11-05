@@ -53,6 +53,17 @@ const ConfirmCtx = createContext<string | null>(null)
 // project's thread is swapped in and out of the runtime (`threads`). History lives in memory for the session only;
 // persist `runtime.thread.export()` per project here when a conversation API exists.
 const projectOf = (_snap: Snapshot) => 'default'
+const THREAD_KEY = (project: string) => `bam-chat-thread:${project}`
+/** Text-only copy of the thread (attachments hold File objects and are not saved). */
+function saveThread(project: string, exp: ExportedMessageRepository) {
+  try {
+    const messages = exp.messages.map(m => ({ ...m, message: { ...m.message, attachments: [] } }))
+    sessionStorage.setItem(THREAD_KEY(project), JSON.stringify({ ...exp, messages }))
+  } catch { /* storage blocked or full: the in-memory copy still holds */ }
+}
+function loadThread(project: string): ExportedMessageRepository | null {
+  try { const raw = sessionStorage.getItem(THREAD_KEY(project)); return raw ? JSON.parse(raw, (k, v) => (k === 'createdAt' && typeof v === 'string' ? new Date(v) : v)) as ExportedMessageRepository : null } catch { return null }
+}
 const threads = new Map<string, ExportedMessageRepository>()
 /** Per project: stage events already in its thread (screen updates, Verify run results, upload summaries). */
 /** Per project: upload record ids already acknowledged with "Files added." (see the effect in AssistantPane). */
@@ -177,6 +188,21 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
     runtime.thread.append({ role: 'user', content: [{ type: 'text', text: ask.text }] })
   }, [ask, runtime])
   const project = projectOf(snap)
+  // Keep-conversation fix (5 Nov 2026): the pane unmounts whenever App shows its loading / error / redirect screen
+  // (snapshot refetch, route redirect), which threw the runtime and the whole chat away. The thread is therefore
+  // restored from the module store on mount and saved there after every change (not while a reply streams), and also
+  // kept in sessionStorage so a reload keeps it too.
+  useEffect(() => {
+    const saved = threads.get(project) ?? loadThread(project)
+    if (saved?.messages.length && runtime.thread.getState().messages.length === 0) { try { runtime.thread.import(saved) } catch { /* unreadable saved thread: start empty */ } }
+    return runtime.thread.subscribe(() => {
+      if (runtime.thread.getState().isRunning) return
+      const exp = runtime.thread.export()
+      if (!exp.messages.length) return // an empty thread never replaces a saved one (a cleared chat is not an unmount)
+      threads.set(project, exp)
+      saveThread(project, exp)
+    })
+  }, [runtime]) // eslint-disable-line react-hooks/exhaustive-deps
   // Switching projects: park this project's thread and load the other one's (never mixed).
   const shownProject = useRef(project)
   useEffect(() => {
