@@ -90,7 +90,7 @@
 .tpl-progress > span { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
 .tpl-manifest .v3-card-title { display: flex; align-items: center; gap: 8px; }
 .tpl-json { max-height: 360px; overflow: auto; }
-.tpl-manifest .monaco-box { height: 360px; }
+.tpl-manifest .monaco-box { flex: 1 0 auto; height: 360px; } /* flex-basis auto: the explicit height stays definite so the editor wrapper's 100% resolves (was collapsing to 0) */
 @media (prefers-reduced-motion: reduce) { .tpl-progress > span { transition: none; } }
 /* Verify: Needs attention, pinned under the stat cards (23 Oct 2026). Scrolls inside past ~45% so the list stays visible. */
 .cq-na { flex: none; max-height: min(45%, 360px); overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); border-radius: 12px; background: var(--err-soft); }
