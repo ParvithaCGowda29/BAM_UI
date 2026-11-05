@@ -276,6 +276,8 @@
 .nv-auto-row > .tip-wrap { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); }
 .nv-auto-row > .tip-wrap:has(.has-mark) { right: 28px; }
 .nv-item.on ~ .tip-wrap .auto-chip { background: var(--accent-ink); }
+/* Person icon on the active row: the chip turns accent-ink, so the icon takes the row's accent color (both themes). */
+.nv-item.on ~ .tip-wrap .hitl-chip { color: var(--accent); }
 .ws-head > .tip-wrap { margin-left: 8px; }
 .v3-table tr.ms-hl > * { background: var(--accent-soft); }
 
