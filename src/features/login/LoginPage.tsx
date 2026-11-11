@@ -130,12 +130,6 @@ const EyeOff = () => (
     <path d="M2 8s2.2-4 6-4c1 0 1.9.3 2.7.7M14 8s-2.2 4-6 4c-1 0-1.9-.3-2.7-.7" /><path d="M6.6 6.6a2 2 0 0 0 2.8 2.8" /><path d="M2.5 2.5l11 11" />
   </svg>
 )
-const Arrow = ({ dir }: { dir: 'left' | 'right' }) => (
-  <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    {dir === 'left' ? <path d="M13 8H3m4-4L3 8l4 4" /> : <path d="M3 8h10M9 4l4 4-4 4" />}
-  </svg>
-)
-
 const ROTATE_MS = 6000
 
 function Showcase() {
@@ -194,10 +188,6 @@ function Showcase() {
                 <button key={k} type="button" className="login-dot" aria-label={`Show message ${k + 1} of ${n}`} aria-current={k === i ? 'true' : undefined}
                   onClick={() => show(k, true)} />
               ))}
-            </div>
-            <div className="login-arrows">
-              <button type="button" className="login-arrow" aria-label="Previous message" onClick={() => show(cur.current - 1, true)}><Arrow dir="left" /></button>
-              <button type="button" className="login-arrow" aria-label="Next message" onClick={() => show(cur.current + 1, true)}><Arrow dir="right" /></button>
             </div>
           </div>
         </div>
