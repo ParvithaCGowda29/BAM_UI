@@ -227,8 +227,8 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
   if (collapsed) return (
     <AssistantRuntimeProvider runtime={runtime}>
       <aside className="shell-pane shell-rail" aria-label="BuLLM Assistant">
-        <button className="rail-show" onClick={toggle} aria-expanded={false} aria-label="Show assistant">
-          <Icon name="panel-right" size={16} /><span>Show assistant</span>
+        <button className="rail-show" onClick={toggle} aria-expanded={false} aria-label="Show assistant" title="Show assistant">
+          <Icon name="panel-right" size={16} />
         </button>
       </aside>
     </AssistantRuntimeProvider>
@@ -240,7 +240,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
         {/* Header row removed per user (5 Nov 2026): no "BuLLM Assistant" title or agent name; the Hide assistant
             control stays, right-aligned, and only where it already appeared (all three panes in). */}
         <header className="shell-head">
-          <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant"><Icon name="panel-left" size={14} />Hide assistant</button>
+          <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant" title="Hide assistant"><Icon name="panel-left" size={14} /></button>
         </header>
         <ScreenCtx.Provider value={screenId}>
           <ThreadBody snap={snap} screenId={screenId} note={note} capture={!!facts.intake?.capture} files={counts.totalFiles}
