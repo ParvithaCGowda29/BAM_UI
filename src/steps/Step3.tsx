@@ -14,6 +14,7 @@ import { setCodeDraft, setDrafts, unsaved, useDrafts } from '../lib/drafts'
 import { certifiedBaseline, currentTests } from '../lib/certification'
 import { Banner, Copy, Empty, ErrorState, GateButton, Icon, Kpis, Pane, Section, Skeleton, StatusPill, Time, fmtDuration, fmtTime, shortHash } from '../components/ui'
 import { SchemasView } from '../rag/RagSeamless'
+import { CodeFileTree } from '../components/CodeFileTree'
 import { tips } from '../lib/actionTips'
 import { approve, templateApproved, templateKey, useApprovals } from '../lib/approvals'
 
@@ -502,17 +503,11 @@ function CodeView({ files, findings, editable, lockedReason, showChanges, cStatu
   }
 
   return (
-    <div className="code-view">
+    <div className="code-workspace">
+      <CodeFileTree paths={files.map(f => f.path)} current={current?.path} onSelect={setPath} status={p => { const f = files.find(f => f.path === p); return f ? [isDirty(f) ? 'Unsaved changes' : f.edited ? 'Edited' : '', findings.some(x => x.file === p && !x.resolved) ? 'Findings' : ''].filter(Boolean).join(' · ') : '' }} />
+      <div className="code-view">
       <div className="code-bar">
-        <label className="field inline">File
-          <select value={current?.path} onChange={e => setPath(e.target.value)}>
-            {files.map(f => (
-              <option key={f.path} value={f.path}>
-                {f.path}{isDirty(f) ? ' • unsaved' : f.edited ? ' • edited' : ''}{findings.some(x => x.file === f.path && !x.resolved) ? ' • findings' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+        <nav className="code-breadcrumb" aria-label="Current file" title={current?.path}>{current?.path.split('/').map((part, i) => <span key={i}>{i > 0 && <span className="muted" aria-hidden> &gt; </span>}{part}</span>)}</nav>
         {current && <Copy value={current.path} display="" label="file path" />}
         {current?.edited && !dirty && <span className="mark-edited"><Icon name="edit" size={10} />Edited by you</span>}
         {dirty && <span className="mark-unsaved" role="status"><Icon name="dot" size={10} />Unsaved changes</span>}
@@ -537,6 +532,7 @@ function CodeView({ files, findings, editable, lockedReason, showChanges, cStatu
           <GateButton action="save" reason={dirty ? undefined : 'No changes to save'} busy={busy === 'Save code'} successKey={savedAt} onClick={save}>Save and re-validate</GateButton>
         </div>
       )}
+      </div>
     </div>
   )
 }
