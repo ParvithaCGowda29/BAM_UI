@@ -53,3 +53,26 @@ test('plural: singular only for exactly one', () => {
   assert.equal(plural(0, 'file'), '0 files')
   assert.equal(plural(2, 'batch', 'batches'), '2 batches')
 })
+
+// Shell arrangement: browser-persisted values cannot hide, duplicate or invent panes.
+import { DEFAULT_PANE_ORDER, paneOrder, paneOrderKey, swapPanes, type PaneOrder } from './paneLayout.ts'
+test('pane layout validates saved data and isolates accounts', () => {
+  for (const bad of [null, {}, [], ['nav'], ['nav', 'nav', 'workspace'], ['nav', 'assistant', 'other']])
+    assert.deepEqual(paneOrder(bad), DEFAULT_PANE_ORDER)
+  assert.equal(paneOrderKey(' A@Example.com '), paneOrderKey('a@example.com'))
+  assert.notEqual(paneOrderKey('a@example.com'), paneOrderKey('b@example.com'))
+})
+test('all six pane orders swap without changing the source or losing a pane', () => {
+  const orders = new Set<string>()
+  for (const a of DEFAULT_PANE_ORDER) for (const b of DEFAULT_PANE_ORDER) {
+    if (a === b) continue
+    const c = DEFAULT_PANE_ORDER.find(x => x !== a && x !== b)!
+    const order: PaneOrder = [a, b, c]
+    orders.add(order.join(','))
+    assert.deepEqual(paneOrder(order), order)
+    assert.deepEqual(swapPanes(swapPanes(order, a, b), a, b), order)
+    assert.deepEqual(swapPanes(order, a, a), order)
+    assert.deepEqual([...order].sort(), [...DEFAULT_PANE_ORDER].sort())
+  }
+  assert.equal(orders.size, 6)
+})

@@ -318,3 +318,20 @@ html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace dialog { visibi
   html[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-assist,
   html[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist { display: flex; }
 }
+
+/* Rearrangement is presentation-only: pane widths and collapse state travel with their pane.
+   Intake's one/two-pane stages and mobile drawers retain their existing layout. */
+@media (min-width: 861px) {
+  html:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] {
+    grid-template-columns: var(--pane-columns);
+  }
+  html:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] > [data-layout-pane="nav"] { order: var(--order-nav); }
+  html:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] > [data-layout-pane="assistant"] { order: var(--order-assistant); }
+  html:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] > [data-layout-pane="workspace"] { order: var(--order-workspace); }
+  html:not([data-upload-stage="1"]):not([data-upload-stage="2"]) [data-pane-handle] { cursor: grab; touch-action: none; }
+  [data-pane-handle]:focus-visible { outline: 2px solid var(--bl-blue); outline-offset: -3px; }
+  .shell[data-pane-drag] { user-select: none; cursor: grabbing; }
+  .shell[data-pane-target="nav"] > [data-layout-pane="nav"],
+  .shell[data-pane-target="assistant"] > [data-layout-pane="assistant"],
+  .shell[data-pane-target="workspace"] > [data-layout-pane="workspace"] { outline: 2px solid var(--bl-blue); outline-offset: 2px; border-radius: 12px; }
+}

@@ -1,3 +1,4 @@
+import { paneHeaderProps } from './PaneLayout'
 // Enterprise Assistant (middle pane), built on assistant-ui primitives with a local runtime. The thread lives for the
 // whole session and is never keyed by screen, so navigating keeps the conversation. Declutter (14 Oct 2026): the pane
 // is only the thread and the composer (input, Dictate, send). The chat holds no unprompted status notes
@@ -226,7 +227,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
   // the thread keeps its messages and background posts (the upload summary) still reach it while the pane is hidden.
   if (collapsed) return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <aside className="shell-pane shell-rail" aria-label="BuLLM Assistant">
+      <aside {...paneHeaderProps} className="shell-pane shell-rail" aria-label="BuLLM Assistant">
         <button className="rail-show" onClick={toggle} aria-expanded={false} aria-label="Show assistant" title="Show assistant">
           <Icon name="panel-right" size={16} />
         </button>
@@ -239,7 +240,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
       <aside className="shell-pane assist" aria-label="BuLLM Assistant" data-screen={screenId}>
         {/* Header row removed per user (5 Nov 2026): no "BuLLM Assistant" title or agent name; the Hide assistant
             control stays, right-aligned, and only where it already appeared (all three panes in). */}
-        <header className="shell-head">
+        <header {...paneHeaderProps} className="shell-head">
           <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant" title="Hide assistant"><Icon name="panel-left" size={14} /></button>
         </header>
         <ScreenCtx.Provider value={screenId}>

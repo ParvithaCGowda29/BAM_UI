@@ -1,3 +1,4 @@
+import { paneHeaderProps } from './PaneLayout'
 import { useEffect, useRef, useState } from 'react'
 import { useUppyState } from '@uppy/react'
 import type { Snapshot } from '../api/types'
@@ -139,7 +140,7 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
 
   if (collapsed) return (
     <nav className="shell-pane shell-rail" aria-label="Workflow navigation">
-      <div className="rail-head">
+      <div {...paneHeaderProps} className="rail-head">
         <button className="icon-btn sm" onClick={toggleRail} aria-expanded={false} aria-label="Expand navigation" title="Expand navigation"><Icon name="panel-right" size={14} /></button>
       </div>
       {/* Collapsed: each stage icon shows its name under it and in a tooltip (hover or focus), with the same marks as the open rail. */}
@@ -157,7 +158,7 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
 
   return (
     <nav className="shell-pane navrail" aria-labelledby="nav-title">
-      <header className="shell-head">
+      <header {...paneHeaderProps} className="shell-head">
         <h2 id="nav-title">{onUpload ? 'Workflow' : <><Icon name="layout" size={13} />Navigate</>}</h2>
         <button className="icon-btn sm" onClick={toggleRail} aria-expanded aria-label="Collapse navigation" title="Collapse"><Icon name="panel-left" size={14} /></button>
       </header>
