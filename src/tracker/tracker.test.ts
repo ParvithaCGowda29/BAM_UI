@@ -7,7 +7,7 @@ import { LEGACY_TRACKER_KEY, TRACKER_KEY, localTrackerStorage } from './trackerS
 // Final workflow (15 Oct 2026): stage > steps in nav order, by stable ID. Labels are names, never numbers.
 const NAV: Record<string, [string, string[]]> = {
   '1': ['Ingestion', ['Upload', 'Standardize', 'Parse', 'Review']],
-  '2': ['Context', ['Sync', 'Index', 'Verify']],
+  '2': ['Context', ['Sync', 'Index', 'Schema', 'Verify']],
   '3': ['Workbench', ['Scope', 'Grid', 'Template', 'Translate']],
   '4': ['Validation', ['Sandbox', 'Check', 'Certify', 'Commit']],
 }
@@ -158,8 +158,8 @@ test('persistence: storage failures surface as errors, never silently', async ()
   await assert.rejects(localTrackerStorage(broken).save(initialStatuses()), /could not be saved.*quota exceeded/)
 })
 
-test('Schema is hidden from Context but its placeholder route is retained', () => {
+test('Schema placeholder is visible in Context without becoming a progress gate', () => {
   assert.equal(SCREEN_ROUTES['2.2'].path, '/rag/schemas')
-  assert.ok(!subtasksOf('2').some(s => s.id === '2.2'))
+  assert.ok(subtasksOf('2').some(s => s.id === '2.2'))
   assert.ok(!countedOf('2').some(s => s.id === '2.2'))
 })
