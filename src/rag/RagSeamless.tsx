@@ -186,8 +186,8 @@ export function ReviewFooter() {
 // Placeholder (16 Nov 2026, per user): Schema moved to Workbench > Template; this route stays as a signpost.
 export function SchemaMovedView() {
   return (
-    <section className="dc rag-fit"><header className="dc-head"><div className="dc-head-text"><h2 id="center-title" tabIndex={-1}>Schema</h2><p className="muted sm">Moved to the Workbench</p></div></header>
-      <p className="dc-none"><Icon name="template" size={16} />Schema drafts now live in Workbench &gt; Template. Switch between Schema and Manifest there.</p>
+    <section className="dc rag-fit"><header className="dc-head"><div className="dc-head-text"><h2 id="center-title" tabIndex={-1}>Placeholder</h2><p className="muted sm">Reserved screen</p></div></header>
+      <p className="dc-none"><Icon name="template" size={16} />This screen is reserved. For the schema editor and manifest generation, open Workbench &gt; Template.</p>
     </section>
   )
 }

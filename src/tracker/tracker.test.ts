@@ -7,13 +7,13 @@ import { LEGACY_TRACKER_KEY, TRACKER_KEY, localTrackerStorage } from './trackerS
 // Final workflow (15 Oct 2026): stage > steps in nav order, by stable ID. Labels are names, never numbers.
 const NAV: Record<string, [string, string[]]> = {
   '1': ['Ingestion', ['Upload', 'Standardize', 'Parse', 'Review']],
-  '2': ['Context', ['Sync', 'Index', 'Schema', 'Verify']],
+  '2': ['Context', ['Sync', 'Index', 'Placeholder', 'Verify']],
   '3': ['Workbench', ['Scope', 'Grid', 'Template', 'Translate']],
   '4': ['Validation', ['Sandbox', 'Check', 'Certify', 'Commit']],
 }
 const ICONS: Record<string, string> = {
   '1': 'tb-inbox', '2': 'tb-git-branch', '3': 'tb-briefcase', '4': 'tb-shield-check',
-  Upload: 'tb-upload', Standardize: 'tb-transform', Parse: 'tb-file-code', Review: 'tb-clipboard-check', Sync: 'tb-refresh', Index: 'tb-search', Schema: 'tb-schema', Verify: 'tb-shield-check',
+  Upload: 'tb-upload', Standardize: 'tb-transform', Parse: 'tb-file-code', Review: 'tb-clipboard-check', Sync: 'tb-refresh', Index: 'tb-search', Placeholder: 'tb-schema', Verify: 'tb-shield-check',
   Scope: 'tb-target', Grid: 'tb-table', Template: 'tb-template', Translate: 'tb-code', Sandbox: 'tb-box', Check: 'tb-list-check', Certify: 'tb-certificate', Commit: 'tb-database-import',
 }
 

@@ -74,7 +74,7 @@ export function screenNote(f: AssistantFacts): string {
       if (st.length && st.every(x => x.status === 'done')) return `Index keeps the current graph nodes screen: ${f.rag.relations?.length ?? 0} relations across ${f.rag.nodes ?? 0} nodes. Select a node to inspect its source and relations.`
       return 'Index runs automatically: building the context graph. Drafts are prepared for Workbench > Template, then Verify follows.'
     }
-    case '2.2': return 'Schema has moved to Workbench > Template. Use the Schema and Manifest switches there. This screen is a placeholder.'
+    case '2.2': return 'This is a placeholder screen. Open Workbench > Template for the schema editor and manifest generation.'
     case '2.3': return 'Test the context with questions in this conversation. Answers keep source links; test results appear together on the right.'
     case '2.4': {
       const pending = (f.rag?.ready ?? []).filter(r => !r.ok)
