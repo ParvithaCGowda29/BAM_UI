@@ -8,7 +8,7 @@ import { RAG_ROUTES, goScreen } from '../lib/route'
 import { demoControls } from '../lib/demo'
 import type { Snapshot } from '../api/types'
 import { Dialog, Empty, ErrorState, Icon, Skeleton, StatusPill, fmtTime } from '../components/ui'
-import { ContextQualityView, RagReviewView, SchemasView } from './RagSeamless'
+import { ContextQualityView, RagReviewView, SchemaMovedView } from './RagSeamless'
 import { CLASS_COUNTS, EDGES, JOBS, NODES, type OkfClass } from './mockData.ts'
 import { buildOkfBundle, conceptStatus, conceptType, OKF_VERSION, toTar, trustTier, validateOkf, type TrustTier } from './okf.ts'
 import { centredViewport, isRunning, ragPipeline, relations, stepStatus, useRag, type RagState, type RagStepKey, type RagStepStatus } from './ragPipeline.ts'
@@ -46,7 +46,7 @@ export function RagScreen({ path, snap }: { path: string; snap: Snapshot }) {
   return (
     <div className={`rag ${path === RAG_ROUTES.graph ? 'rag-graph-page' : ''}`}>
       {!loaded ? <div className="rag-card"><Skeleton rows={8} label="Loading context pipeline" /></div>
-        : path === RAG_ROUTES.graph ? <GraphOrBuild /> : path === RAG_ROUTES.schemas ? <SchemasView />
+        : path === RAG_ROUTES.graph ? <GraphOrBuild /> : path === RAG_ROUTES.schemas ? <SchemaMovedView />
         : path === RAG_ROUTES.review ? <RagReviewView snap={snap} /> : <ContextQualityView />}
     </div>
   )

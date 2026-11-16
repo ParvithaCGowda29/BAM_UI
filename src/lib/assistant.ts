@@ -72,14 +72,9 @@ export function screenNote(f: AssistantFacts): string {
       if (!f.rag?.runId) return 'No context run yet. It starts from Start in Upload.'
       if (st.some(x => x.status === 'failed')) return `${st.find(x => x.status === 'failed')!.label} failed. The automated flow is paused here: retry the failed step on this screen.`
       if (st.length && st.every(x => x.status === 'done')) return `Index keeps the current graph nodes screen: ${f.rag.relations?.length ?? 0} relations across ${f.rag.nodes ?? 0} nodes. Select a node to inspect its source and relations.`
-      return 'Index runs automatically: building the context graph. Schema follows by itself.'
+      return 'Index runs automatically: building the context graph. Drafts are prepared for Workbench > Template, then Verify follows.'
     }
-    case '2.2': {
-      const failed = (f.rag?.steps ?? []).find(x => x.status === 'failed')
-      if (failed) return `${failed.label} failed. The automated flow is paused here: retry the step on this screen.`
-      if (!f.rag?.schemas) return 'Schema runs automatically: drafts are proposed once the graph is built, then sent to the Workbench.'
-      return `${f.rag.schemas} schema drafts are ready and sent to the Workbench automatically. ${f.rag.schema} is open. Changes stay linked to their source and make dependent results stale. Say "rename unit_price to price" to edit a field.`
-    }
+    case '2.2': return 'Schema has moved to Workbench > Template. Use the Schema and Manifest switches there. This screen is a placeholder.'
     case '2.3': return 'Test the context with questions in this conversation. Answers keep source links; test results appear together on the right.'
     case '2.4': {
       const pending = (f.rag?.ready ?? []).filter(r => !r.ok)
@@ -89,7 +84,7 @@ export function screenNote(f: AssistantFacts): string {
     case '3.1': return !snap.sow ? 'No SOW yet. It is generated from the context once the graph is built.'
       : snap.sow.status === 'approved' ? `SOW v${snap.sow.approval?.version} is approved. Any edit invalidates the approval.` : `Review and edit SOW v${snap.sow.version} in the right pane. The FDE approves it before the Grid.`
     case '3.2': return 'Review the Agent > Skill rows inline. Mark the grid reviewed, then generate the ISATVON Contract.'
-    case '4.2': return 'Template shows manifest.json, linked to the approved Scope and Grid.'
+    case '4.2': return 'Template contains Schema and Manifest views. Use Schema to review and edit the context drafts, or Manifest to generate and review manifest.json linked to the approved Scope and Grid.'
     case '4.3': return 'Translate turns the current manifest and approved inputs into checked code.'
     case '4.8': return 'The sandbox uses the current generated artifact. Running it does not commit to BAM_db.'
     case '4.4': case '4.5': case '4.6': case '4.7': return testsLine(snap)

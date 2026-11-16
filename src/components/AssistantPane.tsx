@@ -150,7 +150,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
       }
       // Schemas: field edits are typed or dictated ("rename unit_price to price").
       const ren = /^rename\s+(\w+)\s+to\s+(\w+)\.?$/i.exec(text)
-      if (ren && f.screen?.id === '2.2' && f.rag?.schema) {
+      if (ren && f.screen?.id === '4.2' && f.rag?.schema) {
         const name = f.rag.schema, d = ragPipeline.getState().drafts[name]
         const re = new RegExp(`\\b${ren[1]}\\b`)
         if (!d || !re.test(d.code)) return { content: [{ type: 'text', text: `${name} has no field named ${ren[1]}.` }] }

@@ -13,6 +13,7 @@ import { goScreen, goStep } from '../lib/route'
 import { setCodeDraft, setDrafts, unsaved, useDrafts } from '../lib/drafts'
 import { certifiedBaseline, currentTests } from '../lib/certification'
 import { Banner, Copy, Empty, ErrorState, GateButton, Icon, Kpis, Pane, Section, Skeleton, StatusPill, Time, fmtDuration, fmtTime, shortHash } from '../components/ui'
+import { SchemasView } from '../rag/RagSeamless'
 import { tips } from '../lib/actionTips'
 import { approve, templateApproved, templateKey, useApprovals } from '../lib/approvals'
 
@@ -296,15 +297,30 @@ export function CodeCenter({ snap, info }: StepProps) {
 const PLAN: [Activity['key'], string][] = [['A', 'Validates every ISATVON field against the contract'], ['B', 'Checks the declared dependencies and runtime'],
   ['C', 'Translates each skill and checks the code'], ['D', 'Only if a check fails']]
 /** Ready (no run yet, also shown while the step is still locked behind Grid): what will run. */
+// Schema and Manifest in one screen (16 Nov 2026, per user): the schema editor moved here from Context.
+function TemplateViewToggle({ view, setView }: { view: 'manifest' | 'schema'; setView: (v: 'manifest' | 'schema') => void }) {
+  return (
+    <div className="rs-chips tpl-view-toggle" role="tablist" aria-label="Template view">
+      <button role="tab" aria-selected={view === 'schema'} className="rs-chip" onClick={() => setView('schema')}>Schema</button>
+      <button role="tab" aria-selected={view === 'manifest'} className="rs-chip" onClick={() => setView('manifest')}>Manifest</button>
+    </div>
+  )
+}
+
 export function TemplateReady() {
+  const [view, setView] = useState<'manifest' | 'schema'>('manifest')
   return (
     <Pane id="center-title" kicker="Check activities" title="Template" className="center" actions={<StatusPill status="pending" text="Ready" />}>
+      <TemplateViewToggle view={view} setView={setView} />
+      <div className="rag tpl-schema" style={{ display: view === 'schema' ? undefined : 'none' }}><SchemasView headingId="template-schema-title" /></div>
+      <div style={{ display: view === 'manifest' ? 'contents' : 'none' }}>
       <p className="muted sm">Runs on the reviewed grid when you start it here, or from Grid's Approve.</p>
       <ol className="timeline">{PLAN.map(([k, d]) => (
         <li key={k} className="activity st-queued"><div className="activity-rail"><span className="activity-key" aria-hidden>{k}</span></div>
           <article className="activity-card"><header><h3>{CHECK_NAMES[k]}</h3><StatusPill status="pending" text={k === 'D' ? 'Not needed' : 'Waiting'} /></header>
             <p className="stage-detail">{d}</p></article></li>))}</ol>
       <p className="muted sm"><Icon name="db" size={12} /> Nothing is saved to BAM_db yet.</p>
+      </div>
     </Pane>
   )
 }
@@ -315,6 +331,7 @@ export function TemplateCenter({ snap, info }: StepProps) {
   const draft = useDrafts(d => d.manifest)
   const past = useRuns()
   const [open, setOpen] = useState<string | null>(null)
+  const [view, setView] = useState<'manifest' | 'schema'>('manifest')
   const { busy, run } = useAction()
   const wf = r.wf
   if (!wf) return <TemplateReady />
@@ -332,6 +349,9 @@ export function TemplateCenter({ snap, info }: StepProps) {
   return (
     <Pane id="center-title" kicker="Check activities · manifest.json" title="Template" className="center"
       actions={<StatusPill status={state[0] as 'done'} text={state[1]} />}>
+      <TemplateViewToggle view={view} setView={setView} />
+      <div className="rag tpl-schema" style={{ display: view === 'schema' ? undefined : 'none' }}><SchemasView headingId="template-schema-title" /></div>
+      <div style={{ display: view === 'manifest' ? 'contents' : 'none' }}>
       <span className="sr-only" role="status" aria-live="polite">{live}</span>
       {r.running && <div className="tpl-progress" role="progressbar" aria-label="Checks finished" aria-valuemin={0} aria-valuemax={checks.length} aria-valuenow={passed}>
         <span style={{ width: `${(passed / checks.length) * 100}%` }} /></div>}
@@ -365,6 +385,7 @@ export function TemplateCenter({ snap, info }: StepProps) {
             <span className="muted xs">{fmtDuration(h.startedAt, h.endedAt) ?? '—'}</span></li>))}</ul>
         {shown && <ol className="timeline">{shown.activities.map(x => <ActivityCard key={x.key} a={x} editable={false} busy onRetry={() => {}} />)}</ol>}
       </details>
+      </div>
     </Pane>
   )
 }

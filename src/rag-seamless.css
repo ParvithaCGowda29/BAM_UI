@@ -86,6 +86,7 @@
 .cq-detail-actions { justify-content: flex-end; gap: 10px; margin-top: auto; }
 
 /* Template: progress while the check activities run, and the read-only manifest. */
+.tpl-view-toggle { margin-bottom: 12px; }
 .tpl-progress { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
 .tpl-progress > span { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
 .tpl-manifest .v3-card-title { display: flex; align-items: center; gap: 8px; }

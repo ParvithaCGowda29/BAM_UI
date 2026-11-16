@@ -56,7 +56,7 @@ const SINGLE: Record<string, (p: StepProps) => React.ReactNode> = {
 const FOOT: Record<string, (p: { snap: Snapshot; info?: StepInfo }) => React.ReactNode> = {
   '1.1': p => <UploadFoot snap={p.snap} />, '1.8': p => <StandardizeFooter snap={p.snap} />, '1.9': p => <ParseFooter snap={p.snap} />, '1.4': p => handedOn(p.snap) ? <IngestReviewFooter snap={p.snap} /> : null,
   // Index and Schema are automated: status only (Retry after a failure); they run and advance on their own.
-  '2.5': () => <SyncFooter />, '2.1': () => <AutoContextFooter screen="2.1" />, '2.2': () => <AutoContextFooter screen="2.2" />, '2.3': p => <QualityFooter snap={p.snap} />, '2.4': () => <ReviewFooter />,
+  '2.5': () => <SyncFooter />, '2.1': () => <AutoContextFooter screen="2.1" />, '2.2': () => null, '2.3': p => <QualityFooter snap={p.snap} />, '2.4': () => <ReviewFooter />,
   '4.2': p => <Step3.TemplateFooter snap={p.snap} info={p.info!} />, '4.3': p => <Step3.TranslateFooter snap={p.snap} info={p.info!} />,
   '4.8': p => <Step4.SandboxFooter snap={p.snap} info={p.info!} />, '4.4': p => <Step4.CheckFooter snap={p.snap} info={p.info!} />,
   '4.5': p => <Step4.CertifyFooter snap={p.snap} info={p.info!} />, '4.6': p => <Step4.CommitFooter snap={p.snap} info={p.info!} />,

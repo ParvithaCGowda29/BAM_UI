@@ -7,7 +7,7 @@ import { LEGACY_TRACKER_KEY, TRACKER_KEY, localTrackerStorage } from './trackerS
 // Final workflow (15 Oct 2026): stage > steps in nav order, by stable ID. Labels are names, never numbers.
 const NAV: Record<string, [string, string[]]> = {
   '1': ['Ingestion', ['Upload', 'Standardize', 'Parse', 'Review']],
-  '2': ['Context', ['Sync', 'Index', 'Schema', 'Verify']],
+  '2': ['Context', ['Sync', 'Index', 'Verify']],
   '3': ['Workbench', ['Scope', 'Grid', 'Template', 'Translate']],
   '4': ['Validation', ['Sandbox', 'Check', 'Certify', 'Commit']],
 }
@@ -93,7 +93,7 @@ test('rollup: any started → in progress; nothing started → not started; empt
 test('taskStatus uses only that stage’s screens', () => {
   const s = initialStatuses()
   for (const x of countedOf('1')) s[x.id] = 'done'
-  s['2.2'] = 'needs_review'
+  s['2.3'] = 'needs_review'
   assert.equal(taskStatus('1', s), 'done')
   assert.equal(taskStatus('2', s), 'needs_review')
   assert.equal(taskStatus('4', s), 'not_started')
@@ -156,4 +156,10 @@ test('persistence: storage failures surface as errors, never silently', async ()
   const broken = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('quota exceeded') } }
   assert.match((await localTrackerStorage(broken).load()).error ?? '', /blocked/)
   await assert.rejects(localTrackerStorage(broken).save(initialStatuses()), /could not be saved.*quota exceeded/)
+})
+
+test('Schema is hidden from Context but its placeholder route is retained', () => {
+  assert.equal(SCREEN_ROUTES['2.2'].path, '/rag/schemas')
+  assert.ok(!subtasksOf('2').some(s => s.id === '2.2'))
+  assert.ok(!countedOf('2').some(s => s.id === '2.2'))
 })

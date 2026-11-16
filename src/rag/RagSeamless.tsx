@@ -42,8 +42,8 @@ const Foot = ({ title, line, children }: { title: string; line?: React.ReactNode
 
 // ---- footers -------------------------------------------------------------------------------------------------
 // ---- Index and Schema are automated (16 Oct 2026, per user) --------------------------------------------------
-// Sync's Start starts the automated run: Index advances to Schema once the graph is built; Schema sends
-// every draft to the Workbench as soon as the proposals exist, then advances to Verify (the next human checkpoint).
+// Sync starts the automated run. Index waits for the graph and schema drafts, sends the drafts to
+// Workbench > Template, then advances directly to Verify. The retired Schema route stays a placeholder.
 // Opening Index or Schema from the rail only shows them (no bounce). A failed step pauses the flow on its screen
 // (Retry there; the assistant names the failure) until it succeeds.
 export function useContextAutomation(screenId?: string) {
@@ -55,7 +55,7 @@ export function useContextAutomation(screenId?: string) {
   useEffect(() => {
     // Only once Sync's Start ran for this run, and never on a screen the person browsed to (no bounce).
     if ((screenId !== '2.1' && screenId !== '2.2') || !s.runId || s.contextStartedRun !== s.runId || browsedHere()) return
-    const next = screenId === '2.1' && graph === 'done' ? '2.2' : screenId === '2.2' && schemas === 'done' && !unsent.length ? '2.3' : undefined
+    const next = screenId === '2.1' && graph === 'done' && schemas === 'done' && !unsent.length ? '2.3' : undefined
     if (!next) return
     const t = setTimeout(() => goScreen(next), 600) // just long enough to see the step finish
     return () => clearTimeout(t)
@@ -183,7 +183,16 @@ export function ReviewFooter() {
 }
 
 // ---- Schemas -------------------------------------------------------------------------------------------------
-export function SchemasView() {
+// Placeholder (16 Nov 2026, per user): Schema moved to Workbench > Template; this route stays as a signpost.
+export function SchemaMovedView() {
+  return (
+    <section className="dc rag-fit"><header className="dc-head"><div className="dc-head-text"><h2 id="center-title" tabIndex={-1}>Schema</h2><p className="muted sm">Moved to the Workbench</p></div></header>
+      <p className="dc-none"><Icon name="template" size={16} />Schema drafts now live in Workbench &gt; Template. Switch between Schema and Manifest there.</p>
+    </section>
+  )
+}
+
+export function SchemasView({ headingId = 'center-title' }: { headingId?: string }) {
   const s = useRag(x => x)
   const open = useUi(x => x.ragSchema ?? 'QuoteLine')
   const [info, setInfo] = useState(false)
@@ -191,7 +200,7 @@ export function SchemasView() {
   if (stepStatus(s, 'schemas') !== 'done') {
     const st = s.steps.find(x => x.key === 'schemas'), failed = s.steps.find(x => x.status === 'failed')
     return (
-      <section className="dc rag-fit"><header className="dc-head"><div className="dc-head-text"><h2 id="center-title" tabIndex={-1}>Schema</h2><p className="muted sm">Drafts from context · runs automatically</p></div></header>
+      <section className="dc rag-fit"><header className="dc-head"><div className="dc-head-text"><h2 id={headingId} tabIndex={-1}>Schema</h2><p className="muted sm">Drafts from context · runs automatically</p></div></header>
         {failed ? <div className="rr-warn tone-err" role="alert"><Icon name="alert" size={15} /><div><strong className="sm">{failed.label} failed</strong><span className="xs">{(failed.error ?? 'No reason reported').replace(/\.+$/, '')}. The flow waits here until it succeeds.</span></div>
             <button className="btn btn-secondary sm" onClick={() => ragPipeline.retry(failed.key)}><Icon name="refresh" />Retry</button></div>
           : <p className="dc-none">{st?.status === 'running' ? <Icon name="spinner" size={16} spin /> : <Icon name="clock" size={16} />}{!s.runId ? 'No context run yet.' : st?.status === 'running' ? 'Proposing schema drafts from the context graph…' : 'Waiting for the graph build. Schema drafts are proposed automatically.'}</p>}
@@ -202,8 +211,8 @@ export function SchemasView() {
   const draft = s.drafts[def.name]
   const sent = new Set(s.handoffs.filter(h => h.contextVersion === s.runId).map(h => h.schema))
   return (
-    <section className="dc rag-fit" aria-labelledby="center-title">
-      <h2 id="center-title" className="sr-only" tabIndex={-1}>Schemas</h2>
+    <section className="dc rag-fit" aria-labelledby={headingId}>
+      <h2 id={headingId} className="sr-only" tabIndex={-1}>Schemas</h2>
       <div className="rs-chips" role="tablist" aria-label="Schemas">
         {SCHEMAS.map(x => <button key={x.name} role="tab" aria-selected={x.name === def.name} className="rs-chip" onClick={() => { setEditing(null); setUi({ ragSchema: x.name }) }}>
           {sent.has(x.name) && <Icon name="check" size={11} />}{x.name}</button>)}
