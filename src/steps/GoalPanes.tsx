@@ -10,6 +10,7 @@ import { setUi } from '../lib/store'
 import { KEYS, SECTION, atGoalEntry, continueGoal, expandGoal, getGoal, parseGoal, plain, setGoal, useGoal } from '../lib/goal.ts'
 import { Icon } from '../components/ui'
 import bull from '../assets/login/bull-head-transparent.png'
+import { ChromaticButton } from '../components/chromatic/chromatic-button'
 
 export const GOAL_PREFIX = 'Build an AI agent that automates '
 const EXAMPLES = ['Quoting for Sales managers at SMB manufacturers in India', 'RFQ responses for Procurement and sourcing teams in Europe', 'Quality engineering for Plant and maintenance managers in Southeast Asia']
@@ -134,7 +135,7 @@ export function GoalCapture() {
           if (e.key === 'Backspace' && t.selectionStart <= PLEN && t.selectionEnd <= PLEN) { e.preventDefault(); return }
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() }
         }} />
-      <button type="button" className="goal-send" aria-label="Send goal" aria-disabled={empty || undefined} disabled={empty} onClick={send}><Icon name="tb-arrow-right" size={18} /></button>
+      <ChromaticButton type="button" className="goal-send" aria-label="Send goal" aria-disabled={empty || undefined} disabled={empty} onClick={send}><Icon name="tb-arrow-right" size={18} /></ChromaticButton>
     </div>
   </div>
 }
