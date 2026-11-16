@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/adapter'
 import type { Snapshot } from '../api/types'
-import { layaJudgeContext, simulatedContextJudge } from '../api/sowEval'
+import { simulatedContextJudge } from '../api/sowEval'
 import { browsedHere, goScreen } from '../lib/route'
 import { setUi, useUi } from '../lib/store'
 import { Confirm, Copy, Dialog, GateButton, Icon, Kpis, Time, Tip } from '../components/ui'
@@ -29,7 +29,7 @@ export function useContextEvaluation() {
   useEffect(() => {
     if (!ready || s.contextEvaluation || s.contextEvalStatus === 'running') return
     const req = { sources: JOBS.map(j => j.object), facts: relations(s).slice(0, 5).map(r => `${r.from} ${r.label} ${r.to}`), entities: SCHEMAS.map(x => x.name), schemas: SCHEMAS.map(x => x.name) }
-    void layaJudgeContext(req).catch(() => simulatedContextJudge(req)).then(r => ragPipeline.setContextEvaluation(r))
+    ragPipeline.setContextEvaluation(simulatedContextJudge(req))
   }, [ready, s.contextEvaluation, s.contextEvalStatus])
 }
 

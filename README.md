@@ -13,7 +13,7 @@ The workbench is a guided, four-stage flow. Each stage is a set of screens; the 
 
 Outside the pipeline, **Admin > Masters** holds the master data grids (agents, assistants and the other masters) that feed Context sync.
 
-Engine orchestration is selectable from the login screen: Google Gemini 2.5 Flash in the cloud (via OpenRouter), a local Laya ONNX runtime for offline or edge use, or the deterministic calibrated rule engine.
+Engine orchestration is selectable from the login screen and in engine settings; evaluation runs on the calibrated System-1 engine in the browser.
 
 ## Tech stack
 
@@ -47,20 +47,8 @@ The dev server runs on http://localhost:5174 (strict port; stop whatever else us
 | `npm run storybook` | Start Storybook on port 6006 |
 | `npm run build-storybook` | Build the static Storybook |
 
-## Optional backends
+## Backends
 
-The app runs end to end on built-in mocks. Two real backends can be attached through the Vite dev proxy:
+None. The app is front-end only and runs end to end on built-in mocks: ingestion, the context pipeline, SOW generation and evaluation, and validation all execute in the browser with calibrated local engines. An OpenRouter key entered in engine settings is stored in the browser only.
 
-**Laya judge** (local SOW accuracy judge, used by the Scope screen):
-
-```bash
-cd server/laya-judge
-npm install
-npm start
-```
-
-Listens on port 8787; the dev server proxies `/laya` to it. Point elsewhere with `LAYA_URL`. For the cloud System-1 judge, set `OPENROUTER_API_KEY` (and optionally `OPENROUTER_MODEL`, default `google/gemini-2.5-flash`). An OpenRouter key can also be entered in the app's engine settings, where it is stored in the browser only.
-
-**Cognee** (real RAG backend): run a Cognee server and start the dev server with `VITE_RAG_BACKEND=cognee`; the proxy targets `COGNEE_URL` (default `http://localhost:8000`).
-
-Other environment variables: `VITE_COGNEE_URL` overrides the client-side Cognee base, and `VITE_APP_TIMEZONE` pins the display timezone (default: the viewer's).
+One environment variable: `VITE_APP_TIMEZONE` pins the display timezone (default: the viewer's).

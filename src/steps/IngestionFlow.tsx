@@ -7,7 +7,7 @@ import { useUppyState } from '@uppy/react'
 import { api } from '../api/adapter'
 import { AV_NAME, AV_VENDOR, REPEL_NAME, REPEL_VENDOR, type Snapshot, type UploadRecord } from '../api/types'
 import { ingestionBlock, isReleased, scanView } from '../api/scanGate.ts'
-import { layaJudgeContext, simulatedContextJudge, type ContextJudgeResult } from '../api/sowEval'
+import { simulatedContextJudge, type ContextJudgeResult } from '../api/sowEval'
 import { useAction } from '../lib/data'
 import { browsedHere, goScreen } from '../lib/route'
 import { setUi, uppy } from '../lib/store'
@@ -38,8 +38,8 @@ export function useSufficiency(sources: string[]): Suff {
     if (!sources.length || suff.key === key) return
     setSuff({ key, loading: true })
     const req = { sources, facts: ['standard-spec-verification'], entities: [], schemas: [] }
-    void layaJudgeContext(req).catch(() => simulatedContextJudge(req))
-      .then(result => { if (suff.key === key) setSuff({ key, result, loading: false }) })
+    const result = simulatedContextJudge(req)
+    if (suff.key === key) setSuff({ key, result, loading: false })
   }, [key])
   const s = useSyncExternalStore(cb => { suffSubs.add(cb); return () => { suffSubs.delete(cb) } }, () => suff)
   return s.key === key ? s : { key, loading: !!sources.length }

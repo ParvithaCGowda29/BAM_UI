@@ -2,8 +2,7 @@
 // The mock service simulates a run; a real Cognee/OKF client implements the same RagPipelineService.
 import { useSyncExternalStore } from 'react'
 import { EDGES, JOBS, NODES, SCHEMAS } from './mockData.ts'
-import { cogneeRunner } from './cognee.ts'
-import { layaJudgeContext, simulatedContextJudge, type ContextJudgeRequest, type ContextJudgeResult } from '../api/sowEval.ts'
+import { simulatedContextJudge, type ContextJudgeRequest, type ContextJudgeResult } from '../api/sowEval.ts'
 
 export type RagStepKey = 'chunk' | 'extract' | 'graph' | 'schemas'
 export type RagStepStatus = 'queued' | 'running' | 'done' | 'failed'
@@ -114,15 +113,9 @@ export function createMockRagService({ speed = 1, loadDelay = 300, runner, engin
       entities: customInput?.entities ?? entities,
       schemas: customInput?.schemas ?? SCHEMAS.map(s => s.name),
     }
-    try {
-      const res = await layaJudgeContext(req)
-      set({ contextEvaluation: res, contextEvalStatus: 'done' })
-      return res
-    } catch {
-      const res = simulatedContextJudge(req)
-      set({ contextEvaluation: res, contextEvalStatus: 'done' })
-      return res
-    }
+    const res = simulatedContextJudge(req)
+    set({ contextEvaluation: res, contextEvalStatus: 'done' })
+    return res
   }
 
   setTimeout(() => {
@@ -207,11 +200,8 @@ export function createMockRagService({ speed = 1, loadDelay = 300, runner, engin
 }
 
 
-// VITE_RAG_BACKEND=cognee runs the pipeline on a real Cognee server (proxied at /cognee by Vite; see vite.config.ts).
-const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {}
-export const ragPipeline: RagPipelineService = env.VITE_RAG_BACKEND === 'cognee'
-  ? createMockRagService({ runner: cogneeRunner(env.VITE_COGNEE_URL || '/cognee'), engine: 'cognee' })
-  : createMockRagService()
+// Front-end only: the pipeline always runs on the built-in mock service.
+export const ragPipeline: RagPipelineService = createMockRagService()
 
 export const useRag = <T,>(select: (s: RagState) => T) =>
   useSyncExternalStore(ragPipeline.subscribe, () => select(ragPipeline.getState()))

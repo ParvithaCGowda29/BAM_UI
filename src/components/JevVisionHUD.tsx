@@ -1,7 +1,6 @@
 import { useEffect, useState, useTransition } from 'react'
 import {
   fetchJevModels,
-  layaJudgeContext,
   simulatedContextJudge,
   SIMULATED_JUDGE,
   type ContextJudgeResult,
@@ -54,8 +53,8 @@ export function JevVisionHUD({
         entities,
         schemas,
       }
-      // Judge down or still loading: the simulated judge answers, and the engine chip says so (never a bare "Ready").
-      const res = await layaJudgeContext(req).catch((e: Error) => { console.warn('Laya context judge unavailable:', e.message); return simulatedContextJudge(req) })
+      // Front-end only: the calibrated judge answers locally, and the engine chip says so (never a bare "Ready").
+      const res = simulatedContextJudge(req)
       startTransition(() => {
         setEvalResult(res)
       })

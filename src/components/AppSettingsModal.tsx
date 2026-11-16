@@ -44,19 +44,9 @@ export function AppSettingsModal() {
     try {
       if (trimmed) {
         localStorage.setItem('bam_openrouter_key', trimmed)
-        await fetch('/laya/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey: trimmed }),
-        })
-        toast('OpenRouter API key saved and activated.', 'success')
+        toast('OpenRouter API key saved.', 'success')
       } else {
         localStorage.removeItem('bam_openrouter_key')
-        await fetch('/laya/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey: '' }),
-        })
         toast('OpenRouter API key cleared.', 'info')
       }
     } catch {
@@ -69,15 +59,6 @@ export function AppSettingsModal() {
   const handleClearKey = async () => {
     setApiKey('')
     localStorage.removeItem('bam_openrouter_key')
-    try {
-      await fetch('/laya/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: '' }),
-      })
-    } catch {
-      /* ignore */
-    }
     toast('API key removed from session.', 'info')
   }
 

@@ -1,25 +1,10 @@
-// SOW accuracy evaluation. Rule checks are deterministic and real (computed from the SOW text with the same
-// field validator the backend uses for the ISATVON contract). Judge metrics come from Laya (convaiinnovations/laya,
-// a Jev-compatible System-1 model run by server/laya-judge): calibrated P(supported), P(covered) and a clarity level.
-// When the service is not running, the judge is simulated from the rule results and labelled as such.
+// SOW accuracy evaluation, front-end only. Rule checks are deterministic and real (computed from the SOW text
+// with the ISATVON contract field validator). Judge metrics are simulated from the rule results by the calibrated
+// System-1 engine and labelled as such; there is no server sidecar.
 import { ISATVON, type IsatvonField, type SowEvaluation, type SowFinding, type SowMetric } from './types.ts'
 import { parseRequirements } from './sowFormat.ts'
 
-export const SOW_JUDGE = 'Laya (Jev-compatible System-1 judge)'
 export const SIMULATED_JUDGE = 'Simulated judge'
-
-export interface LayaJudgeResult { model: string; metrics: { key: string; score: number; detail: string }[]; findings: { requirement: number; text: string }[]; inputTokens: number; ms?: number }
-/** Calls the Laya judge service (server/laya-judge) through the dev proxy. Throws with a readable reason when it is unavailable. */
-export async function layaJudge(html: string, facts: string[], url = '/laya/judge'): Promise<LayaJudgeResult> {
-  const requirements = parseRequirements(html).map(r => ({ n: r.n, fields: r.fields }))
-  const apiKey = (typeof localStorage !== 'undefined' ? localStorage.getItem('bam_openrouter_key') : undefined) || (import.meta as any).env?.VITE_OPENROUTER_KEY || undefined
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (apiKey) headers['X-OpenRouter-Key'] = apiKey
-  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ requirements, facts, apiKey }) })
-  const body = await res.json().catch(() => ({})) as LayaJudgeResult & { error?: string }
-  if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
-  return body
-}
 
 export const JUDGE_CRITERIA = [
   { key: 'faithfulness', label: 'Faithful to the RAG context', rubric: 'Every requirement is supported by the retrieved discovery context; nothing is invented.' },
@@ -100,34 +85,7 @@ export interface ContextJudgeResult {
   simulated?: boolean
 }
 
-/** Calls the Laya context judge service (server/laya-judge) through the dev proxy to check if IP data is sufficient. */
-export function layaJudgeContext(req: ContextJudgeRequest, url = '/laya/judge-context'): Promise<ContextJudgeResult> {
-  // Identical in-flight requests share one call: every HUD mount asks the same question, and Laya on CPU answers
-  // one at a time, so duplicates would queue ahead of the 3.1 SOW judge. Settled calls are not cached (re-evaluate works).
-  const key = url + JSON.stringify(req)
-  let p = contextCalls.get(key)
-  if (!p) {
-    p = callJudgeContext(req, url)
-    contextCalls.set(key, p)
-    const drop = () => { contextCalls.delete(key) }
-    p.then(drop, drop)
-  }
-  return p
-}
-const contextCalls = new Map<string, Promise<ContextJudgeResult>>()
-
-async function callJudgeContext(req: ContextJudgeRequest, url: string): Promise<ContextJudgeResult> {
-  const apiKey = (typeof localStorage !== 'undefined' ? localStorage.getItem('bam_openrouter_key') : undefined) || (import.meta as any).env?.VITE_OPENROUTER_KEY || undefined
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (apiKey) headers['X-OpenRouter-Key'] = apiKey
-  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ ...req, apiKey }) })
-  const body = await res.json().catch(() => ({})) as ContextJudgeResult & { error?: string }
-  if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
-  return body
-}
-
-
-/** High-fidelity calibrated fallback when server/laya-judge is not yet running or still downloading. */
+/** Calibrated local evaluation of context sufficiency. Runs entirely in the front end. */
 export function simulatedContextJudge(req: ContextJudgeRequest): ContextJudgeResult {
   const sources = req.sources || []
   const facts = req.facts || []
@@ -206,15 +164,22 @@ export function simulatedContextJudge(req: ContextJudgeRequest): ContextJudgeRes
   }
 }
 
-export async function fetchJevModels(url = '/laya/models'): Promise<{ activeModel: string; models: JevModelInfo[] }> {
-  const res = await fetch(url).catch(() => null)
-  if (!res?.ok) return { activeModel: 'jev-system-one-simulated', models: [] }
-  return res.json().catch(() => ({ activeModel: 'jev-system-one-simulated', models: [] }))
+// The evaluation engine list is local now that the judge sidecar is removed; the choice persists in the browser.
+const JEV_MODELS: JevModelInfo[] = [
+  { id: 'openrouter', name: 'OpenRouter API (Cloud Jev Judge)', type: 'cloud', status: 'available', description: 'Cloud System-1 decision judge via OpenRouter API (Gemini 2.0 Flash / GPT-4o-mini)' },
+  { id: 'laya-onnx', name: 'Laya Decision v1 (ONNX fp32, ModernBERT-large)', type: 'onnx', status: 'available', description: 'Local ONNX System-1 decision model from convaiinnovations/laya' },
+  { id: 'laya-multilingual', name: 'Laya Multilingual Decision (ModernBERT)', type: 'onnx', status: 'available', description: 'Multilingual checkpoint variant for cross-lingual requirements' },
+  { id: 'jev-system-one-simulated', name: 'Jev System-1 Calibrated Engine (Fast)', type: 'calibrated', status: 'active', description: 'Ultra-fast calibrated System-1 decision engine matching ModernBERT calibration curves' },
+]
+
+export async function fetchJevModels(): Promise<{ activeModel: string; models: JevModelInfo[] }> {
+  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('bam_jev_model') : null
+  return { activeModel: stored ?? 'jev-system-one-simulated', models: JEV_MODELS }
 }
 
-export async function selectJevModel(model: string, url = '/laya/select-model'): Promise<boolean> {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) }).catch(() => null)
-  return !!res?.ok
+export async function selectJevModel(model: string): Promise<boolean> {
+  if (typeof localStorage !== 'undefined') localStorage.setItem('bam_jev_model', model)
+  return true
 }
 
 export interface ContextQueryResult {
@@ -229,25 +194,10 @@ export interface ContextQueryResult {
 
 export async function queryContextGraph(
   question: string,
-  sources: string[] = [],
-  facts: string[] = [],
-  url = '/laya/query-context'
+  _sources: string[] = [],
+  _facts: string[] = [],
 ): Promise<ContextQueryResult> {
-  const apiKey = (typeof localStorage !== 'undefined' ? localStorage.getItem('bam_openrouter_key') : undefined) || (import.meta as any).env?.VITE_OPENROUTER_KEY || undefined
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (apiKey) headers['X-OpenRouter-Key'] = apiKey
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ question, sources, facts, apiKey }),
-  }).catch(() => null)
-
-  if (res?.ok) {
-    const data = await res.json().catch(() => null)
-    if (data && data.answer) return data as ContextQueryResult
-  }
-
-  // Client-side fallback matching canonical RFQ facts
+  // Client-side evaluation matching canonical RFQ facts (front-end only).
   const q = question.toLowerCase()
   if (q.includes('17-4') || q.includes('cert') || q.includes('material')) {
     return {

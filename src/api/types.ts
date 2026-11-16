@@ -114,7 +114,7 @@ export interface SowEvaluation {
   judge: string
   /** True while the judge is simulated by the mock backend (no judge model connected). */
   simulated: boolean
-  /** Why the judge is simulated (e.g. the Laya service is not running), or model details when it is real. */
+  /** Why the judge is simulated (the calibrated engine is front-end only), or model details when it is real. */
   judgeNote?: string
   overall?: number
   metrics: SowMetric[]

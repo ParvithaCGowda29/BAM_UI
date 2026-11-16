@@ -3,7 +3,7 @@
 // It owns every gate and every status; the UI only renders what it returns.
 import type { BamApi, ScanOutcome } from './adapter.ts'
 import { acceptedType, ingestionBlock, isReleased } from './scanGate.ts'
-import { JUDGE_CRITERIA, SIMULATED_JUDGE, SOW_JUDGE, layaJudge, overall, ruleChecks } from './sowEval.ts'
+import { JUDGE_CRITERIA, SIMULATED_JUDGE, overall, ruleChecks } from './sowEval.ts'
 import { contextFacts, ragPipeline } from '../rag/ragPipeline.ts'
 import {
   ACCEPTED_TYPES, AUTOMATIONS, ISATVON, chunkCount, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_UPLOAD_BYTES,
@@ -289,31 +289,22 @@ export function createMockApi({ speed = 1 } = {}): BamApi {
     return version
   }
 
-  // Accuracy evaluation for the current version: real rule checks, then the Laya judge (server/laya-judge).
-  // When Laya is not reachable the judge metrics are simulated from the rule results, and the card says so.
+  // Accuracy evaluation for the current version: real rule checks, then judge metrics simulated from the rule
+  // results by the calibrated System-1 engine. Front-end only: there is no judge sidecar, and the card says so.
   async function evaluateSow() {
     const sow = s.sow
     if (!sow) return
     const version = sow.version
-    sow.evaluation = { version, status: 'running', at: now(), judge: SOW_JUDGE, simulated: false, metrics: [], findings: [] }
+    sow.evaluation = { version, status: 'running', at: now(), judge: SIMULATED_JUDGE, simulated: true, metrics: [], findings: [] }
     await sleep(600)
     if (s.sow?.version !== version) return // superseded by a newer version
     const html = sow.html
     const { metrics, findings } = ruleChecks(html, validateField)
-    let judged, judge = SOW_JUDGE, simulated = false, judgeNote: string
-    try {
-      // Discovery facts from the RAG context: Cognee's entity relations ("A has_document B"), plus entity facts on the fixture.
-      const r = await layaJudge(html, contextFacts(ragPipeline.getState()))
-      judged = JUDGE_CRITERIA.map(c => { const m = r.metrics.find(x => x.key === c.key)!; return { key: c.key, label: c.label, method: 'judge' as const, score: m.score, detail: `${c.rubric} ${m.detail}` } })
-      findings.push(...r.findings.map(f => ({ requirement: f.requirement, passageId: reqPassage(f.requirement), field: 'Laya', text: f.text })))
-      judgeNote = `${r.model} · ${r.inputTokens} tokens${r.ms ? ` · ${(r.ms / 1000).toFixed(1)} s` : ''}`
-    } catch (e) {
-      const by = (k: string) => metrics.find(m => m.key === k)!.score
-      const base: Record<string, number> = { faithfulness: 0.6 * by('validity') + 36, coverage: 0.5 * by('completeness') + 45, clarity: 0.7 * by('specificity') + 25 }
-      judged = JUDGE_CRITERIA.map(c => ({ key: c.key, label: c.label, method: 'judge' as const, score: Math.min(100, Math.round(base[c.key])), detail: `${c.rubric} (simulated)` }))
-      judge = SIMULATED_JUDGE; simulated = true
-      judgeNote = `Laya unavailable (${(e as Error).message}). Start server/laya-judge to score with the real model.`
-    }
+    const by = (k: string) => metrics.find(m => m.key === k)!.score
+    const base: Record<string, number> = { faithfulness: 0.6 * by('validity') + 36, coverage: 0.5 * by('completeness') + 45, clarity: 0.7 * by('specificity') + 25 }
+    const judged = JUDGE_CRITERIA.map(c => ({ key: c.key, label: c.label, method: 'judge' as const, score: Math.min(100, Math.round(base[c.key])), detail: `${c.rubric} (simulated)` }))
+    const judge = SIMULATED_JUDGE, simulated = true
+    const judgeNote = 'Simulated judge: calibrated from the deterministic rule checks.'
     if (s.sow?.version !== version) return
     const all = [...metrics, ...judged]
     sow.evaluation = { version, status: 'done', at: now(), judge, simulated, judgeNote, overall: overall(all), metrics: all, findings }
