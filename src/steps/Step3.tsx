@@ -396,7 +396,7 @@ type Monaco = Parameters<OnMount>[1]
 
 /**
  * Editable Monaco view. With `showChanges` it is an inline diff against `original` (green added, red removed),
- * like the colour coding on the SOW and the grid; the right-hand (current) side is the one you edit.
+ * like the colour coding on the SOW and the grid. Only current-content line numbers are shown.
  */
 export function ReviewEditor({ path, language, original, value, editable, lockedReason, showChanges, onChange, onSave, onReady, startAtTop }: {
   path: string; language: string; original: string; value: string; editable: boolean; lockedReason: string; showChanges: boolean
@@ -430,6 +430,11 @@ export function ReviewEditor({ path, language, original, value, editable, locked
         // Models are reused by path; letting the wrapper dispose them on unmount races the diff widget.
         keepCurrentOriginalModel keepCurrentModifiedModel
         onMount={(d, m) => {
+          // Inline diff still reserves a second gutter for baseline line numbers by default.
+          // Keep the current gutter only; removed lines remain inline in red without old numbers.
+          d.getOriginalEditor().updateOptions({ lineNumbers: 'off', lineNumbersMinChars: 0, lineDecorationsWidth: 0 })
+          const baselineNode = d.getOriginalEditor().getDomNode()
+          if (baselineNode) baselineNode.style.visibility = 'hidden'
           bind(d.getModifiedEditor(), m)
           if (!startAtTop) return
           topOf(d.getModifiedEditor())
