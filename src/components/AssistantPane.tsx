@@ -348,7 +348,7 @@ function Composer({ capture, chips }: { capture: boolean; chips: string[] }) {
       </Tip>
       <label className="sr-only" htmlFor="as-input">{capture ? 'Intake objective' : 'Message the Enterprise Assistant'}</label>
       <div className="as-field">
-        <ComposerPrimitive.Input id="as-input" className="as-input" rows={1} placeholder="Ask about this output..." />
+        <ComposerPrimitive.Input id="as-input" className="as-input" rows={1} placeholder="ask BuLLM" />
         {dictation && <DictateListening />}
       </div>
       {dictation && <DictateControls />}
