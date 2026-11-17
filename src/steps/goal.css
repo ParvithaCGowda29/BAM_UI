@@ -240,3 +240,16 @@ html[data-fs-landing] .assist .as-compose { animation: fs-fade 140ms linear 700m
   html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > * { animation: none; }
   html[data-upload-stage="2"] .shell[data-screen="1.1"]::before { display: none; }
 }
+
+/* ---- What / Who / Where cards under the goal box (17 Nov 2026, per user) ---- */
+.goal-parts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.goal-part { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-align: left; cursor: pointer;
+  transition: border-color .12s ease, box-shadow .12s ease, transform .12s ease; }
+.goal-part:hover { border-color: var(--bl-blue); background: color-mix(in srgb, var(--bl-blue-soft) 60%, var(--surface)); box-shadow: 0 2px 6px rgb(0 0 0 / .08); transform: translateY(-1px); }
+.goal-part:focus-visible { outline: none; box-shadow: var(--focus); }
+.goal-part-label { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--bl-blue); }
+.goal-part-value { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
+.goal-part-empty .goal-part-value { color: var(--muted); }
+/* Hero stage: the cards row hugs the same 660px centered width as the goal box. */
+html[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-parts { width: 100%; max-width: 660px; margin-inline: auto; }

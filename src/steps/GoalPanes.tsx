@@ -88,6 +88,30 @@ function flyCard(box: HTMLElement, text: string, go: () => void) {
   }, 100)
 }
 
+type Span = [number, number] | null
+/** What / Who / Where spans of the goal sentence as offsets into `value`, split exactly like parseGoal (first
+ *  " for ", then " in "); without " for " the whole text is the What, like the draft. Trailing dots/spaces belong
+ *  to no part. Drives the three cards under the box (17 Nov 2026, per user): click a card to highlight its part. */
+function partSpans(value: string): [Span, Span, Span] {
+  const base = value.length - value.replace(/^build an ai agent that automates\s+/i, '').length
+  const typed = value.slice(base)
+  const end = typed.replace(/[.\s]+$/, '').length
+  if (!end) return [null, null, null]
+  const m = /^(.*?)\s+for\s+(.*?)(?:\s+in\s+(.+))?$/i.exec(typed.slice(0, end))
+  if (!m) return [[base, base + end], null, null]
+  const what: Span = m[1] ? [base, base + m[1].length] : null
+  const whoStart = m[1].length + (/^\s+for\s+/i.exec(typed.slice(m[1].length))?.[0].length ?? 0)
+  const who: Span = m[2] ? [base + whoStart, base + whoStart + m[2].length] : null
+  let where: Span = null
+  if (m[3] != null) {
+    const wEnd = whoStart + m[2].length
+    const wStart = wEnd + (/^\s+in\s+/i.exec(typed.slice(wEnd))?.[0].length ?? 0)
+    where = m[3] ? [base + wStart, base + wStart + m[3].length] : null
+  }
+  return [what, who, where]
+}
+const GOAL_PARTS = [{ label: 'What', hint: 'what it automates' }, { label: 'Who', hint: 'for who' }, { label: 'Where', hint: 'in where' }] as const
+
 /** Middle pane on Upload while the thread is empty and no goal is expanded yet. */
 export function GoalCapture() {
   const PLEN = GOAL_PREFIX.length
@@ -104,6 +128,14 @@ export function GoalCapture() {
   useEffect(() => { const e = ta.current; if (e) { e.style.height = 'auto'; e.style.height = `${Math.min(e.scrollHeight, 160)}px` } }, [value])
   const typed = value.slice(PLEN)
   const empty = !typed.trim()
+  const spans = partSpans(value)
+  /** Click a What/Who/Where card: select its span in the box (the highlight); a part not written yet lands the caret at the end. */
+  const highlightPart = (span: Span) => {
+    const e = ta.current
+    if (!e) return
+    e.focus()
+    e.setSelectionRange(span ? span[0] : e.value.length, span ? span[1] : e.value.length)
+  }
   const boxRef = useRef<HTMLDivElement>(null)
   const send = () => {
     if (empty || leaving.current) return
@@ -136,6 +168,15 @@ export function GoalCapture() {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() }
         }} />
       <ChromaticButton type="button" className="goal-send" aria-label="Send goal" aria-disabled={empty || undefined} disabled={empty} onClick={send}><Icon name="tb-arrow-right" size={18} /></ChromaticButton>
+    </div>
+    <div className="goal-parts" role="group" aria-label="What, who and where in your goal">
+      {GOAL_PARTS.map((p, i) => { const span = spans[i]; const text = span ? value.slice(span[0], span[1]) : ''
+        return <button type="button" key={p.label} className={`goal-part${span ? '' : ' goal-part-empty'}`}
+          aria-label={text ? `${p.label}: ${text}. Highlight it in the goal.` : `${p.label} is not in the goal yet. Go to the end of the goal.`}
+          onClick={() => highlightPart(span)}>
+          <span className="goal-part-label">{p.label}</span>
+          <span className="goal-part-value">{text || p.hint}</span>
+        </button> })}
     </div>
   </div>
 }
