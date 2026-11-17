@@ -44,8 +44,9 @@
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
 }
 .shell-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none;
-  height: var(--head); padding: 0 12px 0 var(--pad); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none; position: relative;
+  /* 17 Nov 2026, per user: reserve a fixed slot at the left edge for the swap grip, same in every pane header. */
+  height: var(--head); padding: 0 12px 0 calc(var(--pad) + 26px); border-bottom: 1px solid var(--border);
 }
 .shell-head h2 { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--text); min-width: 0; }
 /* Collapse at the far-left edge, then the title, then the swap grip (17 Nov 2026, approved wireframes change 1). */
@@ -348,7 +349,7 @@ html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace dialog { visibi
 /* Change 3 (updated 17 Nov 2026, per user): a self-drawn two-panes/double-arrow grip in every pane header.
    It is a button (click moves the pane one position left, wrapping from the left edge to the far right) and is
    highlighted - accent colour on a soft chip - so it stands out in the header. */
-.pane-grip { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; margin-left: 4px; padding: 2px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--bl-blue) 14%, transparent); color: var(--bl-blue); cursor: pointer; transition: background .15s ease; }
+.pane-grip { display: inline-grid; place-items: center; position: absolute; left: var(--pad); top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 2px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--bl-blue) 14%, transparent); color: var(--bl-blue); cursor: pointer; transition: background .15s ease; }
 .pane-grip:hover, .pane-grip:focus-visible { background: color-mix(in srgb, var(--bl-blue) 26%, transparent); }
 
 /* Change 2: the picked-up pane lifts as a ghost at ~90% opacity with a raised shadow. */
