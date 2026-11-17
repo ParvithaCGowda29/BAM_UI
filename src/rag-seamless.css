@@ -86,13 +86,29 @@
 .cq-detail-actions { justify-content: flex-end; gap: 10px; margin-top: auto; }
 
 /* Template: progress while the check activities run, and the read-only manifest. */
-.tpl-view-toggle { margin-bottom: 12px; }
+/* Template view toggle: one segmented control instead of two loose chips (17 Nov 2026, per user). */
+.tpl-view-toggle {
+  display: inline-flex; align-self: flex-start; align-items: center; gap: 2px;
+  padding: 2px; margin-bottom: 12px;
+  border: 1px solid var(--border); border-radius: 99px; background: var(--surface-2);
+}
+.tpl-tab {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 14px;
+  border: 1px solid transparent; border-radius: 99px; background: transparent;
+  font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.tpl-tab:hover { color: var(--text); }
+.tpl-tab .icon { color: var(--faint); transition: color .15s ease; }
+.tpl-tab[aria-selected="true"] { background: var(--surface); border-color: var(--border-strong); color: var(--text); box-shadow: 0 1px 2px rgba(15, 27, 45, .10); }
+.tpl-tab[aria-selected="true"] .icon { color: var(--accent-txt); }
+.tpl-tab:focus-visible { outline: 2px solid var(--accent-txt); outline-offset: 1px; }
 .tpl-progress { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
 .tpl-progress > span { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
 .tpl-manifest .v3-card-title { display: flex; align-items: center; gap: 8px; }
 .tpl-json { max-height: 360px; overflow: auto; }
 .tpl-manifest .monaco-box { flex: 1 0 auto; height: 360px; } /* flex-basis auto: the explicit height stays definite so the editor wrapper's 100% resolves (was collapsing to 0) */
-@media (prefers-reduced-motion: reduce) { .tpl-progress > span { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tpl-progress > span, .tpl-tab, .tpl-tab .icon { transition: none; } }
 /* Verify: Needs attention, pinned under the stat cards (23 Oct 2026). Scrolls inside past ~45% so the list stays visible. */
 .cq-na { flex: none; max-height: min(45%, 360px); overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); border-radius: 12px; background: var(--err-soft); }
 .cq-na-h { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; font-weight: 700; color: var(--err); }

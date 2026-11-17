@@ -301,9 +301,13 @@ const PLAN: [Activity['key'], string][] = [['A', 'Validates every ISATVON field 
 // Schema and Manifest in one screen (16 Nov 2026, per user): the schema editor moved here from Context.
 function TemplateViewToggle({ view, setView }: { view: 'manifest' | 'schema'; setView: (v: 'manifest' | 'schema') => void }) {
   return (
-    <div className="rs-chips tpl-view-toggle" role="tablist" aria-label="Template view">
-      <button role="tab" aria-selected={view === 'schema'} className="rs-chip" onClick={() => setView('schema')}>Schema</button>
-      <button role="tab" aria-selected={view === 'manifest'} className="rs-chip" onClick={() => setView('manifest')}>Manifest</button>
+    <div className="tpl-view-toggle" role="tablist" aria-label="Template view">
+      <button role="tab" aria-selected={view === 'schema'} className="tpl-tab" onClick={() => setView('schema')}>
+        <Icon name="tb-schema" size={13} />Schema
+      </button>
+      <button role="tab" aria-selected={view === 'manifest'} className="tpl-tab" onClick={() => setView('manifest')}>
+        <Icon name="tb-file-code" size={13} />Manifest
+      </button>
     </div>
   )
 }
