@@ -345,12 +345,11 @@ html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace dialog { visibi
 }
 
 /* ---- pane swap transition, grips, hairlines, resize dividers, first-use hint (17 Nov 2026, approved wireframes) ---- */
-/* Change 3 (updated 17 Nov 2026, per user): a two-panes/swap-arrows grip in every pane header - faint at rest,
-   full strength on hover; it is also a button (click swaps the pane one position left). */
-.pane-grip { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; margin-left: 4px; padding: 2px; border: 0; background: none; color: var(--muted); opacity: .35; cursor: pointer; transition: opacity .15s ease; }
-.pane-grip:hover:not(:disabled), .pane-grip:focus-visible { opacity: 1; }
-.pane-grip:disabled { opacity: .18; cursor: default; }
-@media (hover: none) { .pane-grip { opacity: .8; } }
+/* Change 3 (updated 17 Nov 2026, per user): a self-drawn two-panes/double-arrow grip in every pane header.
+   It is a button (click moves the pane one position left, wrapping from the left edge to the far right) and is
+   highlighted - accent colour on a soft chip - so it stands out in the header. */
+.pane-grip { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; margin-left: 4px; padding: 2px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--bl-blue) 14%, transparent); color: var(--bl-blue); cursor: pointer; transition: background .15s ease; }
+.pane-grip:hover, .pane-grip:focus-visible { background: color-mix(in srgb, var(--bl-blue) 26%, transparent); }
 
 /* Change 2: the picked-up pane lifts as a ghost at ~90% opacity with a raised shadow. */
 .pane-ghost { position: fixed; z-index: 100; margin: 0; display: flex; opacity: .9; pointer-events: none; filter: drop-shadow(0 16px 30px rgb(15 23 42 / .35)); }
