@@ -365,6 +365,9 @@ export function PaneLayout({ children, ...props }: HTMLAttributes<HTMLDivElement
       <div key={`${d.left}|${d.right}`}
         className={`pane-divider${rsz?.i === d.i ? ' on' : ''}`}
         style={{ left: dividerLeft(d.i) }}
+        // 17 Nov 2026, per user: the grip pill appears where the cursor points along the line, not only mid-line.
+        onPointerEnter={e => { const r = e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty('--grip-y', `${Math.min(Math.max(e.clientY - r.top, 16), r.height - 16)}px`) }}
+        onPointerMoveCapture={e => { if (rszGesture.current) return; const r = e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty('--grip-y', `${Math.min(Math.max(e.clientY - r.top, 16), r.height - 16)}px`) }}
         role="separator" aria-orientation="vertical" tabIndex={0}
         aria-label={`Resize ${d.left} and ${d.right} panes`}
         title="Drag to resize · double-click to reset"
