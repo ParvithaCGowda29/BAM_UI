@@ -29,8 +29,8 @@ const PaneOrderCtx = createContext<{ order: PaneOrder; moveLeft: (p: PaneId) => 
 export const usePaneSpot = (pane: PaneId) => useContext(PaneOrderCtx).order.indexOf(pane)
 
 /** Swap grip in every pane header (17 Nov 2026, per user - replaces the six-dot grip from the approved wireframes,
- *  change 3): a self-drawn two-panes + double-arrow icon (drawn in-repo after she chose "draw it" over the flaticon
- *  pick's attribution requirement), faint at rest and full strength on hover. It is also
+ *  change 3): the tabler "replace" icon she supplied verbatim (17 Nov 2026), highlighted on a chip at the
+ *  header's left-edge slot, same in all three panes. It is also
  *  an action button: one click swaps the pane one position left (disabled at the left edge); header drag and
  *  Alt+Arrow still work. */
 export function PaneGrip({ pane }: { pane: PaneId }) {
@@ -38,12 +38,13 @@ export function PaneGrip({ pane }: { pane: PaneId }) {
   return (
     <button type="button" className="pane-grip" onClick={() => moveLeft(pane)}
       aria-label="Move pane one position left" title="Move pane left">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="1.2" y="5" width="3.6" height="6" rx="1.2" />
-        <rect x="11.2" y="5" width="3.6" height="6" rx="1.2" />
-        <path d="M5.8 8h4.4" />
-        <path d="M7.2 6.6 5.8 8l1.4 1.4" />
-        <path d="M8.8 6.6 10.2 8l-1.4 1.4" />
+      {/* 17 Nov 2026, per user: the exact tabler "replace" icon she supplied (MIT, no attribution needed). */}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M3 4a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" />
+        <path d="M15 16a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4" />
+        <path d="M21 11v-3a2 2 0 0 0 -2 -2h-6l3 3m0 -6l-3 3" />
+        <path d="M3 13v3a2 2 0 0 0 2 2h6l-3 -3m0 6l3 -3" />
       </svg>
     </button>
   )
