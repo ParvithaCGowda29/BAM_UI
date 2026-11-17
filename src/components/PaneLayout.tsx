@@ -34,12 +34,10 @@ export const usePaneSpot = (pane: PaneId) => useContext(PaneOrderCtx).order.inde
  *  an action button: one click swaps the pane one position left (disabled at the left edge); header drag and
  *  Alt+Arrow still work. */
 export function PaneGrip({ pane }: { pane: PaneId }) {
-  const { order, moveLeft } = useContext(PaneOrderCtx)
-  const first = order.indexOf(pane) <= 0
+  const { moveLeft } = useContext(PaneOrderCtx)
   return (
-    <button type="button" className="pane-grip" disabled={first} onClick={() => moveLeft(pane)}
-      aria-label={first ? 'Pane is at the left edge' : 'Move pane one position left'}
-      title={first ? 'Pane is at the left edge' : 'Move pane left'}>
+    <button type="button" className="pane-grip" onClick={() => moveLeft(pane)}
+      aria-label="Move pane one position left" title="Move pane left">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="1.2" y="5" width="3.6" height="6" rx="1.2" />
         <rect x="11.2" y="5" width="3.6" height="6" rx="1.2" />
@@ -294,8 +292,10 @@ export function PaneLayout({ children, ...props }: HTMLAttributes<HTMLDivElement
   const moveLeft = (p: PaneId) => {
     const cur = orderRef.current
     const i = cur.indexOf(p)
-    if (i <= 0) return
-    glide(() => persistOrder(swapPanes(cur, p, cur[i - 1])))
+    if (i < 0) return
+    // 17 Nov 2026, per user: clicking must always move the pane - at the left edge it wraps to the far right.
+    const next = i === 0 ? ([...cur.slice(1), p] as PaneOrder) : swapPanes(cur, p, cur[i - 1])
+    glide(() => persistOrder(next))
     hintDone()
   }
 
