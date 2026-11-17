@@ -104,6 +104,9 @@ export function PaneLayout({ children, ...props }: HTMLAttributes<HTMLDivElement
   }
   const pctOf = (p: PaneId) => p === 'nav' ? widths.nav : p === 'assistant' ? widths.assist : workspacePct(widths)
   const collapsed = (p: PaneId) => p === 'nav' ? shell.nav : p === 'assistant' ? shell.assistant : false
+  // Collapsed widths (17 Nov 2026, per user): NAVIGATE keeps a slim 56px icon rail (its stage icons); the
+  // assistant folds to the 6px hairline from the approved wireframes.
+  const collapsedPx = (p: PaneId) => p === 'nav' ? 56 : 6
   const hintDone = () => {
     try { localStorage.setItem(PANE_HINT_KEY, 'done') } catch { /* storage blocked */ }
     setHint(null)
@@ -157,12 +160,12 @@ export function PaneLayout({ children, ...props }: HTMLAttributes<HTMLDivElement
    *  fr shares (goal.css: nav .8fr · assistant 1.6fr · workspace 1fr, split among the open panes); elsewhere
    *  the 20/40/40 shares. The last column takes whatever is left. */
   const pxWidthOf = (p: PaneId, cur: PaneOrder, contentW: number, gap: number): number => {
-    if (collapsed(p)) return 6
+    if (collapsed(p)) return collapsedPx(p)
     const total = contentW - 2 * gap
     if (onUpload) {
       const frac: Record<PaneId, number> = { nav: 0.8, assistant: 1.6, workspace: 1 }
       const openSum = cur.reduce((s, q) => s + (collapsed(q) ? 0 : frac[q]), 0)
-      const hairlines = cur.filter(q => collapsed(q)).length * 6
+      const hairlines = cur.reduce((s, q) => s + (collapsed(q) ? collapsedPx(q) : 0), 0)
       return frac[p] / openSum * (total - hairlines)
     }
     return total * pctOf(p) / 100
@@ -255,13 +258,13 @@ export function PaneLayout({ children, ...props }: HTMLAttributes<HTMLDivElement
   // The last OPEN pane in the visual order is the flexible one (a collapsed pane is always a 6px hairline).
   const lastOpen = order.reduce((last, p, i) => (collapsed(p) ? last : i), -1)
   const colExpr = (p: PaneId, i: number): string => {
-    if (collapsed(p)) return '6px'
+    if (collapsed(p)) return `${collapsedPx(p)}px`
     if (i === lastOpen) return 'minmax(0, 1fr)'
     return `calc((100% - 2 * var(--gap)) * ${pctOf(p) / 100})`
   }
   const legacyWidth: Record<PaneId, string> = { nav: 'var(--nav)', assistant: 'var(--assist)', workspace: 'minmax(0, 1fr)' }
   const columns = onUpload
-    ? order.map(p => collapsed(p) ? '6px' : legacyWidth[p])
+    ? order.map(p => collapsed(p) ? `${collapsedPx(p)}px` : legacyWidth[p])
     : order.map((p, i) => colExpr(p, i))
   const dividerLeft = (i: number) =>
     `calc(var(--gap) + ${columns.slice(0, i + 1).join(' + ')} + ${i} * var(--gap) + var(--gap) / 2)`

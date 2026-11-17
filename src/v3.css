@@ -25,7 +25,7 @@
 /* ---- shell grid ---- */
 /* One canvas: the same gap between panes and around them, one header height, one body padding, one rail width. */
 .shell {
-  --gap: 12px; --pad: 16px; --head: 52px; --rail: 6px;
+  --gap: 12px; --pad: 16px; --head: 52px; --rail: 56px;
   /* 17 Nov 2026 (approved pane wireframes): default widths NAVIGATE 20% · assistant 40% · RESULTS & EDITS 40% of the
      content width; --pane-columns (set by PaneLayout) carries the exact shares, drag-resize and the 6px hairlines.
      A collapsed pane is a hairline; the last pane in the visual order takes the freed space. --nav/--assist below stay
@@ -106,12 +106,17 @@
 /* Collapsed rail: the stage-name tooltip opens to the right of the icon, outside the 56px rail. */
 .shell-rail.shell-pane { overflow: visible; }
 .shell-rail .tip { left: calc(100% + 10px); right: auto; top: 50%; bottom: auto; transform: translateY(-50%); white-space: nowrap; }
+.shell-rail[data-opens="left"] .tip { left: auto; right: calc(100% + 10px); }
+.shell-rail[data-opens="left"] .tip::after { left: auto; right: -5px; transform: rotate(-45deg); }
 .shell-rail .tip::after { left: -5px; right: auto; top: 50%; margin-top: -4px; transform: rotate(135deg); }
 
 /* ---- collapsed rails: identical for NAVIGATE and Enterprise Assistant (toggle in the header row, content below) ---- */
 .shell-rail { align-items: stretch; }
 .rail-head { height: var(--head); flex: none; display: grid; place-items: center; border-bottom: 1px solid var(--border); }
-.shell-rail .nv-mini { padding: var(--pad) 0; align-items: center; }
+.shell-rail .nv-mini { padding: var(--pad) 0; align-items: center; gap: 14px; }
+/* Dotted connector between the stage icons (per user, 17 Nov 2026); names stay in tooltips, so the mini labels hide. */
+.shell-rail .nv-mini-label { display: none; }
+.shell-rail .nv-mini > li:not(:last-child) .nv-dot::after { content: ''; position: absolute; top: calc(100% + 1px); left: 50%; height: 13px; border-left: 2px dotted var(--border-strong); }
 .nv-mini > li { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .nv-mini-label { max-width: 54px; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: -.01em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nv-mini > li:has(.nv-dot.on) .nv-mini-label { color: var(--accent-txt); }
