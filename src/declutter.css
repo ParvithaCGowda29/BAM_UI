@@ -287,3 +287,4 @@
 .up-ctx-item:hover:not(:disabled), .up-ctx-item:focus-visible { background: var(--err-soft); outline: none; }
 .up-ctx-item:disabled { opacity: .5; cursor: not-allowed; }
 .up-ctx > p { margin: 2px 12px 6px; }
+.up-modal-drop { padding: 26px 18px; }
