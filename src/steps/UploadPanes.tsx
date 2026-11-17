@@ -274,7 +274,16 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
       {leaving && <UploadIdle leaving />}
       {/* Failures first, each with its reason always visible and its fix (29 Oct 2026). */}
       {failed.length > 0 && <section className="up-attn" aria-labelledby="up-attn-h">
-        <h3 id="up-attn-h" className="up-sec">Needs attention</h3>
+        <div className="up-attn-head">
+          <h3 id="up-attn-h" className="up-sec">Needs attention</h3>
+          {/* Bulk Discard (17 Nov 2026, per user): discards every listed file, same as each card's Discard.
+              Refused rows are dropped by list index, so they go highest-index-first to keep indices valid. */}
+          {failed.length > 1 && <button className="btn btn-ghost sm up-attn-clear" disabled={!!acting}
+            onClick={() => void run('Discard all', async () => {
+              const ordered = [...failed].sort((a, b) => (b.id.startsWith('refused-') ? Number(b.id.slice(8)) : -1) - (a.id.startsWith('refused-') ? Number(a.id.slice(8)) : -1))
+              for (const r of ordered) await discard(snap, r)
+            }, { step: 1 })}><Icon name="tb-trash" size={14} />Discard all ({failed.length})</button>}
+        </div>
         {failed.map(r => { const f = fixOf(r), m = rowMenu(r)
           return <div key={r.id} {...m} className={`up-attn-card${m.className ? ` ${m.className}` : ''}`}>
             <Icon name="tb-alert-triangle" size={16} />

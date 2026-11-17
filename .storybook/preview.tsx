@@ -5,6 +5,8 @@ import '../src/v3.css'
 import '../src/ingestion.css'
 import '../src/declutter.css'
 import '../src/rag-seamless.css'
+// goal.css holds the Upload pane styles (.up-*); the app loads it via GoalPanes, stories need it directly.
+import '../src/steps/goal.css'
 
 const preview: Preview = {
   parameters: {
