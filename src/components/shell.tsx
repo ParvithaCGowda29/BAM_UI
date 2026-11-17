@@ -170,7 +170,7 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
       {/* Collapse control at the pane's far-left edge, before the title (17 Nov 2026, approved wireframes change 1). */}
       <header {...paneHeaderProps} className="shell-head">
         <button className="icon-btn sm" onClick={toggleRail} aria-expanded aria-label="Collapse navigation" title="Collapse"><Icon name="panel-left" size={14} /></button>
-        <h2 id="nav-title">{onUpload ? 'Workflow' : <><Icon name="layout" size={13} />Navigate</>}</h2>
+        <h2 id="nav-title">{onUpload ? 'Workflow' : 'Navigate'}</h2>
         <PaneGrip />
       </header>
       <div className="nv-body">
