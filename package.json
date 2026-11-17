@@ -6,7 +6,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "check": "node --experimental-strip-types src/api/mock.check.ts",
-    "test": "node --experimental-strip-types --test src/tracker/tracker.test.ts src/tracker/evidence.test.ts src/rag/ragPipeline.test.ts src/lib/sowDiff.test.ts src/lib/repair.test.ts src/lib/bamUi.test.ts src/lib/assistant.test.ts src/api/scanGate.test.ts src/api/standardize.test.ts src/api/fileKind.test.ts src/lib/goal.test.ts src/lib/fileTree.test.ts src/rag/okf.test.ts",
+    "test": "node --experimental-strip-types --test src/tracker/tracker.test.ts src/tracker/evidence.test.ts src/rag/ragPipeline.test.ts src/lib/sowDiff.test.ts src/lib/repair.test.ts src/lib/bamUi.test.ts src/lib/assistant.test.ts src/api/scanGate.test.ts src/api/standardize.test.ts src/api/fileKind.test.ts src/lib/goal.test.ts src/lib/fileTree.test.ts src/lib/paneLayout.test.ts src/rag/okf.test.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

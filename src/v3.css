@@ -25,10 +25,13 @@
 /* ---- shell grid ---- */
 /* One canvas: the same gap between panes and around them, one header height, one body padding, one rail width. */
 .shell {
-  --gap: 12px; --pad: 16px; --head: 52px; --rail: 56px;
-  /* NAVIGATE and the workspace share the width; the assistant has one clamped width on every stage (21 Oct 2026, round 3),
-     so collapsing NAVIGATE or a grid reflow never resizes the chat. A collapsed pane gives its share to the workspace. */
+  --gap: 12px; --pad: 16px; --head: 52px; --rail: 6px;
+  /* 17 Nov 2026 (approved pane wireframes): default widths NAVIGATE 20% · assistant 40% · RESULTS & EDITS 40% of the
+     content width; --pane-columns (set by PaneLayout) carries the exact shares, drag-resize and the 6px hairlines.
+     A collapsed pane is a hairline; the last pane in the visual order takes the freed space. --nav/--assist below stay
+     for Upload's own stages (goal.css), which keep their earlier layout. */
   --nav: minmax(0, 1fr); --assist: clamp(320px, 32vw, 480px);
+  position: relative;
   display: grid; grid-template-columns: var(--nav) var(--assist) minmax(0, 1fr); gap: var(--gap);
   padding: var(--gap); min-height: 0; min-width: 0; background: var(--bg);
 }
@@ -45,6 +48,8 @@
   height: var(--head); padding: 0 12px 0 var(--pad); border-bottom: 1px solid var(--border);
 }
 .shell-head h2 { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--text); min-width: 0; }
+/* Collapse at the far-left edge, then the title, then the swap grip (17 Nov 2026, approved wireframes change 1). */
+.navrail .shell-head { justify-content: flex-start; }
 .navrail .shell-head h2 { text-transform: uppercase; letter-spacing: .08em; }
 .shell-head h2 .icon { color: var(--muted); }
 
@@ -298,8 +303,8 @@ html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-hide { display: none; 
    would be an empty bar, so the whole row goes; the thread/goal card starts at the pane top. */
 html[data-upload-stage="1"] .shell[data-screen="1.1"] .assist > .shell-head,
 html[data-upload-stage="2"] .shell[data-screen="1.1"] .assist > .shell-head { display: none; }
-/* With the title gone the Hide assistant control is the header's only child - keep it at the right edge. */
-.assist > .shell-head { justify-content: flex-end; }
+/* The swap grip sits at the left edge; the Hide assistant control keeps the right edge (17 Nov 2026). */
+.assist > .shell-head { justify-content: space-between; }
 html[data-upload-stage="1"] .shell[data-screen="1.1"] .workspace,
 html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace {
   /* Collapsed, not display:none, so the review dialog (a top-layer <dialog> inside this pane) can still open from the files pane. */
@@ -331,7 +336,48 @@ html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace dialog { visibi
   html:not([data-upload-stage="1"]):not([data-upload-stage="2"]) [data-pane-handle] { cursor: grab; touch-action: none; }
   [data-pane-handle]:focus-visible { outline: 2px solid var(--bl-blue); outline-offset: -3px; }
   .shell[data-pane-drag] { user-select: none; cursor: grabbing; }
-  .shell[data-pane-target="nav"] > [data-layout-pane="nav"],
-  .shell[data-pane-target="assistant"] > [data-layout-pane="assistant"],
-  .shell[data-pane-target="workspace"] > [data-layout-pane="workspace"] { outline: 2px solid var(--bl-blue); outline-offset: 2px; border-radius: 12px; }
+  html:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] > .pane-divider { display: block; }
 }
+
+/* ---- pane swap transition, grips, hairlines, resize dividers, first-use hint (17 Nov 2026, approved wireframes) ---- */
+/* Change 3: a six-dot grip in every pane header - faint at rest, full strength on hover; touch screens always show it. */
+.pane-grip { display: inline-grid; place-items: center; flex: none; width: 14px; margin-left: 4px; color: var(--muted); opacity: .35; transition: opacity .15s ease; }
+[data-pane-handle]:hover .pane-grip, [data-pane-handle]:focus-visible .pane-grip { opacity: 1; }
+@media (hover: none) { .pane-grip { opacity: .8; } }
+
+/* Change 2: the picked-up pane lifts as a ghost at ~90% opacity with a raised shadow. */
+.pane-ghost { position: fixed; z-index: 100; margin: 0; display: flex; opacity: .9; pointer-events: none; filter: drop-shadow(0 16px 30px rgb(15 23 42 / .35)); }
+.pane-ghost > * { flex: 1; min-width: 0; }
+/* The landing place is a dashed slot; neighbours glide aside in real time (FLIP in PaneLayout). */
+.shell-slot[data-drop-slot] { position: relative; }
+.shell-slot[data-drop-slot] > * { visibility: hidden; }
+.shell-slot[data-drop-slot]::before { content: ''; position: absolute; inset: 0; border: 2px dashed var(--bl-blue); border-radius: 12px; background: var(--bl-blue-soft); }
+.shell-slot[data-drop-slot]::after { content: 'Drop to place here'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--bl-blue); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+
+/* Change 4: a collapsed pane is a 6 px hairline in the background colour - no icon, no label, no visible strip.
+   Hovering the edge fades in a slim strip with a chevron; click or pull it to restore the pane. */
+.shell-hair { position: relative; background: none; border: 0; border-radius: 0; overflow: visible; }
+.shell-hair::before { content: ''; position: absolute; top: 6px; bottom: 6px; left: 2px; width: 2px; border-radius: 2px; background: var(--border-strong); opacity: .45; }
+.shell-hair .hair-hot { position: absolute; top: 0; bottom: 0; left: -5px; right: -5px; }
+.hair-restore { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 25; width: 26px; height: 64px; padding: 0; border-radius: 999px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); color: var(--accent-txt); cursor: pointer; opacity: 0; transition: opacity .15s ease; }
+.shell-hair:hover .hair-restore, .hair-restore:focus-visible { opacity: 1; }
+.shell-hair[data-opens="left"] .hair-restore .icon { transform: rotate(180deg); }
+
+/* Change 5: drag a divider to resize - the line lights up with a pill grip; a live readout shows all three widths.
+   Double-click a divider resets to 20 / 40 / 40. */
+.pane-divider { display: none; position: absolute; top: var(--gap); bottom: var(--gap); z-index: 30; width: 14px; transform: translateX(-50%); cursor: col-resize; touch-action: none; }
+.pane-divider::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; border-radius: 2px; background: transparent; transition: background .15s ease; }
+.pane-divider::after { content: ''; position: absolute; top: 50%; left: 50%; width: 8px; height: 28px; transform: translate(-50%, -50%); border-radius: 99px; background: transparent; transition: background .15s ease; }
+.pane-divider:hover::before, .pane-divider.on::before, .pane-divider:focus-visible::before { background: var(--bl-blue); }
+.pane-divider:hover::after, .pane-divider.on::after, .pane-divider:focus-visible::after { background: var(--bl-blue); box-shadow: inset 0 0 0 1.5px var(--surface); }
+.pane-divider:focus-visible { outline: none; }
+.pane-readout { position: fixed; z-index: 120; transform: translate(-50%, 0); padding: 6px 12px; border-radius: 99px; background: #101828; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: var(--shadow); }
+
+/* Change 3: first visit only - a one-time hint points at a grip; it retires forever after the first successful swap. */
+.pane-hint { position: fixed; z-index: 130; transform: translateX(-50%); max-width: 300px; padding: 12px 14px; border-radius: 12px; background: var(--bl-blue); color: #fff; box-shadow: var(--shadow); font-size: 13px; }
+.pane-hint::before { content: ''; position: absolute; top: -5px; left: 50%; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); background: inherit; }
+.pane-hint p { margin: 0 0 10px; font-weight: 600; line-height: 1.35; }
+.pane-hint-actions { display: flex; align-items: center; gap: 12px; }
+.pane-hint-ok { padding: 5px 14px; border: 0; border-radius: 99px; background: #fff; color: var(--bl-blue); font-weight: 700; font-size: 12px; cursor: pointer; }
+.pane-hint-later { padding: 5px 0; border: 0; background: none; color: rgb(255 255 255 / .85); font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.pane-hint-later:hover { color: #fff; }

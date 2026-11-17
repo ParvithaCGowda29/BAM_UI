@@ -1,4 +1,4 @@
-import { paneHeaderProps } from './PaneLayout'
+import { Hairline, PaneGrip, paneHeaderProps } from './PaneLayout'
 // Enterprise Assistant (middle pane), built on assistant-ui primitives with a local runtime. The thread lives for the
 // whole session and is never keyed by screen, so navigating keeps the conversation. Declutter (14 Oct 2026): the pane
 // is only the thread and the composer (input, Dictate, send). The chat holds no unprompted status notes
@@ -72,7 +72,9 @@ const ackedIds = new Map<string, Set<string>>()
 const ackedFor = (project: string) => { let s = ackedIds.get(project); if (!s) ackedIds.set(project, s = new Set()); return s }
 
 export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; screenId?: string; locked?: string }) {
-  const collapsed = useUi(s => s.shell.assistant)
+  const drawer = useUi(s => s.drawer)
+  // Narrow screens open the pane as an overlay drawer: always show the full pane there (17 Nov 2026).
+  const collapsed = useUi(s => s.shell.assistant) && drawer !== 'assistant'
   const objective = useUi(s => (s.fdeGoals ?? '').trim())
   const ragSchema = useUi(s => s.ragSchema ?? 'QuoteLine')
   const ask = useUi(s => s.assistantAsk)
@@ -225,13 +227,11 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
 
   // Hidden by the person only (Hide assistant); a stage change never hides it. The runtime provider stays mounted, so
   // the thread keeps its messages and background posts (the upload summary) still reach it while the pane is hidden.
+  // Collapsed (17 Nov 2026, approved wireframes change 4): a 6 px hairline, no icon or label; hover the edge for
+  // the restore strip. The runtime provider stays mounted so the thread and background posts survive.
   if (collapsed) return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <aside {...paneHeaderProps} className="shell-pane shell-rail" aria-label="BuLLM Assistant">
-        <button className="rail-show" onClick={toggle} aria-expanded={false} aria-label="Show assistant" title="Show assistant">
-          <Icon name="panel-right" size={16} />
-        </button>
-      </aside>
+      <Hairline pane="assistant" label="Show assistant" onRestore={toggle} />
     </AssistantRuntimeProvider>
   )
   return (
@@ -241,6 +241,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
         {/* Header row removed per user (5 Nov 2026): no "BuLLM Assistant" title or agent name; the Hide assistant
             control stays, right-aligned, and only where it already appeared (all three panes in). */}
         <header {...paneHeaderProps} className="shell-head">
+          <PaneGrip />
           <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant" title="Hide assistant"><Icon name="panel-left" size={14} /></button>
         </header>
         <ScreenCtx.Provider value={screenId}>
