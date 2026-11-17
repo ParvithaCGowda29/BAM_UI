@@ -310,7 +310,8 @@ html[data-upload-stage="2"] .shell[data-screen="1.1"] .as-hide { display: none; 
 html[data-upload-stage="1"] .shell[data-screen="1.1"] .assist > .shell-head,
 html[data-upload-stage="2"] .shell[data-screen="1.1"] .assist > .shell-head { display: none; }
 /* The swap grip sits at the left edge; the Hide assistant control keeps the right edge (17 Nov 2026). */
-.assist > .shell-head { justify-content: space-between; }
+/* 17 Nov 2026, per user: the assistant's Hide control sits at the header's left edge, like NAVIGATE's collapse. */
+.assist > .shell-head { justify-content: flex-start; }
 html[data-upload-stage="1"] .shell[data-screen="1.1"] .workspace,
 html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace {
   /* Collapsed, not display:none, so the review dialog (a top-layer <dialog> inside this pane) can still open from the files pane. */
