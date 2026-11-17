@@ -241,7 +241,7 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
         {/* Header row removed per user (5 Nov 2026): no "BuLLM Assistant" title or agent name; the Hide assistant
             control stays, right-aligned, and only where it already appeared (all three panes in). */}
         <header {...paneHeaderProps} className="shell-head">
-          <PaneGrip />
+          <PaneGrip pane="assistant" />
           <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant" title="Hide assistant"><Icon name="panel-left" size={14} /></button>
         </header>
         <ScreenCtx.Provider value={screenId}>

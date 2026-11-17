@@ -345,9 +345,11 @@ html[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace dialog { visibi
 }
 
 /* ---- pane swap transition, grips, hairlines, resize dividers, first-use hint (17 Nov 2026, approved wireframes) ---- */
-/* Change 3: a six-dot grip in every pane header - faint at rest, full strength on hover; touch screens always show it. */
-.pane-grip { display: inline-grid; place-items: center; flex: none; width: 14px; margin-left: 4px; color: var(--muted); opacity: .35; transition: opacity .15s ease; }
-[data-pane-handle]:hover .pane-grip, [data-pane-handle]:focus-visible .pane-grip { opacity: 1; }
+/* Change 3 (updated 17 Nov 2026, per user): a two-panes/swap-arrows grip in every pane header - faint at rest,
+   full strength on hover; it is also a button (click swaps the pane one position left). */
+.pane-grip { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; margin-left: 4px; padding: 2px; border: 0; background: none; color: var(--muted); opacity: .35; cursor: pointer; transition: opacity .15s ease; }
+.pane-grip:hover:not(:disabled), .pane-grip:focus-visible { opacity: 1; }
+.pane-grip:disabled { opacity: .18; cursor: default; }
 @media (hover: none) { .pane-grip { opacity: .8; } }
 
 /* Change 2: the picked-up pane lifts as a ghost at ~90% opacity with a raised shadow. */

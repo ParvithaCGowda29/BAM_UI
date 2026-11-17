@@ -25,19 +25,29 @@ const readWidths = (key: string): PaneWidths => {
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Where a pane sits in the current visual order (0 = left edge, 2 = right edge). */
-const PaneOrderCtx = createContext<PaneOrder>([...DEFAULT_PANE_ORDER])
-export const usePaneSpot = (pane: PaneId) => useContext(PaneOrderCtx).indexOf(pane)
+const PaneOrderCtx = createContext<{ order: PaneOrder; moveLeft: (p: PaneId) => void }>({ order: [...DEFAULT_PANE_ORDER], moveLeft: () => {} })
+export const usePaneSpot = (pane: PaneId) => useContext(PaneOrderCtx).order.indexOf(pane)
 
-/** Six-dot grip in every pane header (approved wireframes, change 3): faint at rest, full strength on hover. */
-export function PaneGrip() {
+/** Swap grip in every pane header (17 Nov 2026, per user - replaces the six-dot grip from the approved wireframes,
+ *  change 3): the two-panes-with-swap-arrows icon she picked, faint at rest and full strength on hover. It is also
+ *  an action button: one click swaps the pane one position left (disabled at the left edge); header drag and
+ *  Alt+Arrow still work. */
+export function PaneGrip({ pane }: { pane: PaneId }) {
+  const { order, moveLeft } = useContext(PaneOrderCtx)
+  const first = order.indexOf(pane) <= 0
   return (
-    <span className="pane-grip" aria-hidden="true">
-      <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
-        <circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" />
-        <circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" />
-        <circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" />
+    <button type="button" className="pane-grip" disabled={first} onClick={() => moveLeft(pane)}
+      aria-label={first ? 'Pane is at the left edge' : 'Move pane one position left'}
+      title={first ? 'Pane is at the left edge' : 'Move pane left'}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="2" y="5.4" width="4.4" height="5.4" rx="1" />
+        <rect x="9.6" y="5.4" width="4.4" height="5.4" rx="1" />
+        <path d="M4.6 3.1a5.2 5.2 0 0 1 6.9-.9" />
+        <path d="M9.5 1.3l2 .9-1.7 1.5" />
+        <path d="M11.4 12.9a5.2 5.2 0 0 1-6.9.9" />
+        <path d="M6.5 14.7l-2-.9 1.7-1.5" />
       </svg>
-    </span>
+    </button>
   )
 }
 
@@ -280,7 +290,16 @@ export function PaneLayout({ children, ...props }: HTMLAttributes<HTMLDivElement
     '--order-workspace': order.indexOf('workspace'),
   } as CSSProperties
 
-  return <PaneOrderCtx.Provider value={order}>
+  /** One click on the grip button swaps the pane one position left (17 Nov 2026, per user); same glide as a drag. */
+  const moveLeft = (p: PaneId) => {
+    const cur = orderRef.current
+    const i = cur.indexOf(p)
+    if (i <= 0) return
+    glide(() => persistOrder(swapPanes(cur, p, cur[i - 1])))
+    hintDone()
+  }
+
+  return <PaneOrderCtx.Provider value={{ order, moveLeft }}>
     <div {...props} ref={root} style={style} data-pane-order={order.join(',')} data-pane-drag={drag ?? undefined}
     onPointerDownCapture={e => {
       const el = e.target as HTMLElement
@@ -389,7 +408,7 @@ export function PaneLayout({ children, ...props }: HTMLAttributes<HTMLDivElement
     )}
     {hint && (
       <div className="pane-hint" style={{ left: hint.x, top: hint.y }} role="dialog" aria-label="Panes can be rearranged">
-        <p>Drag a pane by its grip to rearrange your workspace.</p>
+        <p>Drag a pane by its header, or click its swap icon, to rearrange your workspace.</p>
         <div className="pane-hint-actions">
           <button type="button" className="pane-hint-ok" onClick={hintDone}>Got it</button>
           <button type="button" className="pane-hint-later" onClick={() => setHint(null)}>Show me again later</button>

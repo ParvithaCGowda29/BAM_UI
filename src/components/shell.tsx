@@ -171,7 +171,7 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
       <header {...paneHeaderProps} className="shell-head">
         <button className="icon-btn sm" onClick={toggleRail} aria-expanded aria-label="Collapse navigation" title="Collapse"><Icon name="panel-left" size={14} /></button>
         <h2 id="nav-title">{onUpload ? 'Workflow' : 'Navigate'}</h2>
-        <PaneGrip />
+        <PaneGrip pane="nav" />
       </header>
       <div className="nv-body">
         {/* Upload swaps the search card for + Add files in the same slot; the card stays laid out (invisible) so the slot

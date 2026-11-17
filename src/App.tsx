@@ -226,7 +226,7 @@ function Workbench() {
           <header {...paneHeaderProps} className="shell-head ws-head">
             {screen?.id === '1.1'
               ? <UploadHead snap={snap} />
-              : <>{prev && <button className="icon-btn sm ws-back" onClick={() => goScreen(prev.id, true)} title={`Back to ${prev.label}`} aria-label={`Back to ${prev.label}`}><Icon name="back" size={14} /></button>}<h2 id="ws-title" tabIndex={-1}><Icon name="table" size={13} /><span className="ws-kicker">Results &amp; edits</span><span className="ws-title">{title}</span></h2><PaneGrip />{screen?.item.mode === 'automated' && <AutoChip className="ws-auto" />}{screen?.item.mode === 'hitl' && <HitlChip className="ws-auto" />}
+              : <>{prev && <button className="icon-btn sm ws-back" onClick={() => goScreen(prev.id, true)} title={`Back to ${prev.label}`} aria-label={`Back to ${prev.label}`}><Icon name="back" size={14} /></button>}<h2 id="ws-title" tabIndex={-1}><Icon name="table" size={13} /><span className="ws-kicker">Results &amp; edits</span><span className="ws-title">{title}</span></h2><PaneGrip pane="workspace" />{screen?.item.mode === 'automated' && <AutoChip className="ws-auto" />}{screen?.item.mode === 'hitl' && <HitlChip className="ws-auto" />}
                 <span className="ws-hint" title={hint}>{hint}</span></>}
           </header>
           <div className="ws-body" ref={wsBody}>{body}</div>
@@ -240,7 +240,7 @@ function Workbench() {
 
 // Upload's right pane (4 Nov 2026): Outputs. It is hidden until files are added (see useUploadStage).
 function UploadHead({ snap }: { snap: Snapshot }) {
-  return <><h2 id="ws-title" tabIndex={-1}><span className="ws-title up-title">Outputs</span><UploadCount snap={snap} /></h2><PaneGrip /><UploadMenu snap={snap} /></>
+  return <><h2 id="ws-title" tabIndex={-1}><span className="ws-title up-title">Outputs</span><UploadCount snap={snap} /></h2><PaneGrip pane="workspace" /><UploadMenu snap={snap} /></>
 }
 const UploadFoot = ({ snap }: { snap: Snapshot }) => <UploadFooter snap={snap} />
 /** Pane progression on Upload: 1 = middle only, 2 = goal expanded (files pane opens), 3 = files added (outputs pane opens). */
