@@ -29,7 +29,8 @@ const PaneOrderCtx = createContext<{ order: PaneOrder; moveLeft: (p: PaneId) => 
 export const usePaneSpot = (pane: PaneId) => useContext(PaneOrderCtx).order.indexOf(pane)
 
 /** Swap grip in every pane header (17 Nov 2026, per user - replaces the six-dot grip from the approved wireframes,
- *  change 3): the two-panes-with-swap-arrows icon she picked, faint at rest and full strength on hover. It is also
+ *  change 3): a self-drawn two-panes + double-arrow icon (drawn in-repo after she chose "draw it" over the flaticon
+ *  pick's attribution requirement), faint at rest and full strength on hover. It is also
  *  an action button: one click swaps the pane one position left (disabled at the left edge); header drag and
  *  Alt+Arrow still work. */
 export function PaneGrip({ pane }: { pane: PaneId }) {
@@ -40,12 +41,11 @@ export function PaneGrip({ pane }: { pane: PaneId }) {
       aria-label={first ? 'Pane is at the left edge' : 'Move pane one position left'}
       title={first ? 'Pane is at the left edge' : 'Move pane left'}>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="2" y="5.4" width="4.4" height="5.4" rx="1" />
-        <rect x="9.6" y="5.4" width="4.4" height="5.4" rx="1" />
-        <path d="M4.6 3.1a5.2 5.2 0 0 1 6.9-.9" />
-        <path d="M9.5 1.3l2 .9-1.7 1.5" />
-        <path d="M11.4 12.9a5.2 5.2 0 0 1-6.9.9" />
-        <path d="M6.5 14.7l-2-.9 1.7-1.5" />
+        <rect x="1.2" y="5" width="3.6" height="6" rx="1.2" />
+        <rect x="11.2" y="5" width="3.6" height="6" rx="1.2" />
+        <path d="M5.8 8h4.4" />
+        <path d="M7.2 6.6 5.8 8l1.4 1.4" />
+        <path d="M8.8 6.6 10.2 8l-1.4 1.4" />
       </svg>
     </button>
   )
